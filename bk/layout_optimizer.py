@@ -552,7 +552,10 @@ class GridLayoutEngine:
         if not fixes:
             return
         W, D = self.store_w, self.store_d
-        margin = 50          # tiny margin so the fixture is truly at the wall
+        # _in_store() rejects anything below x/y=100, so this margin must be
+        # >= 100 or every single placement attempt fails that check before
+        # it even gets to look for free space.
+        margin = 100
 
         # Track current cursor position along each wall (mm from corner)
         cursors = {'LEFT': margin, 'RIGHT': margin, 'FRONT': margin, 'BACK': margin}
