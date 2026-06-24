@@ -666,7 +666,7 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
     response = client.chat.completions.create(
         model=AI_MODEL,
         messages=[{"role": "user", "content": user_content}],  # type: ignore[arg-type]
-        max_tokens=16384,
+        max_tokens=32768,
     )
 
     # ── Token usage logging ───────────────────────────────────────────────────
