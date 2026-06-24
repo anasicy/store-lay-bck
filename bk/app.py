@@ -496,6 +496,20 @@ def ai_layout_dxf():
                 reference_file_path=reference_file_path,
             )
             if ai_placements and len(ai_placements) > 0:
+                # Drop any placement the AI hallucinated that wasn't actually
+                # requested (e.g. an unselected cash counter or fixture type).
+                _allowed_names = {f['name'].lower() for f in selected_fixtures}
+                _allowed_names |= {n.lower() for n in _boh_requested}
+                _before_hallucination_filter = len(ai_placements)
+                ai_placements = [
+                    p for p in ai_placements
+                    if p.get('fixture', '').lower() in _allowed_names
+                ]
+                if len(ai_placements) < _before_hallucination_filter:
+                    _logger.info(
+                        f"[ai-layout] Dropped {_before_hallucination_filter - len(ai_placements)} "
+                        f"hallucinated placement(s) not in the requested fixture/room list."
+                    )
                 placement_source = 'ai'
             else:
                 ai_error = "AI returned empty placements list — falling back to grid engine."
@@ -687,8 +701,11 @@ def ai_layout_dxf():
                 W, D = engine.store_w, engine.store_d
                 _margin = 400
 
-                cash_placements = [p for p in ai_placements if p.get('zone') == 'CASH']
-                non_cash = [p for p in ai_placements if p.get('zone') != 'CASH']
+                def _is_cash(p):
+                    return p.get('zone') == 'CASH' or 'cash counter' in p['fixture'].lower()
+
+                cash_placements = [p for p in ai_placements if _is_cash(p)]
+                non_cash = [p for p in ai_placements if not _is_cash(p)]
 
                 for cp in cash_placements:
                     w, d = cp['l'], cp['d']
@@ -721,7 +738,9 @@ def ai_layout_dxf():
                     _cx_cursor = czx1 + _gap
                     _cy_cursor = czy1 + _gap
                     for p in ai_placements:
-                        if p.get('zone') != 'CLINIC':
+                        _is_clinic = (p.get('zone') == 'CLINIC'
+                                      or 'clinic room' in p['fixture'].lower())
+                        if not _is_clinic:
                             continue
                         rot = p.get('rotation', 0) in (90, 270)
                         fw = p['d'] if rot else p['l']
@@ -755,8 +774,6 @@ def ai_layout_dxf():
                     _by = bzy1 + _bgap
                     _brow_h = 0
                     for p in ai_placements:
-                        if p.get('zone') not in ('BOH', 'FITTING_LAB'):
-                            continue
                         pname_low = p['fixture'].lower()
                         if not any(k in pname_low for k in _BOH_NAMES):
                             continue
