@@ -838,10 +838,9 @@ class GridLayoutEngine:
         if self.has_pantry:
             _try_place('PANTRY', self.PANTRY_W, self.PANTRY_D)
 
-        # Fitting rooms
+        # Fitting room
         if self.has_fitting_rooms:
-            _try_place('FITTING ROOM 1', self.FITTING_ROOM_W, self.FITTING_ROOM_D)
-            _try_place('FITTING ROOM 2', self.FITTING_ROOM_W, self.FITTING_ROOM_D)
+            _try_place('FITTING ROOM', self.FITTING_ROOM_W, self.FITTING_ROOM_D)
 
         # FR room (franchisee)
         if self.has_fr_room:

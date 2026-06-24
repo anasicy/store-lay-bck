@@ -89,7 +89,7 @@ function RequirementsForm({ onComplete, disabled }) {
       req.has_storage       && 'Storage',
       req.has_electrical    && 'Electrical Room',
       req.has_fr_room       && 'FR Room',
-      req.has_fitting_rooms && 'Fitting Rooms',
+      req.has_fitting_rooms && 'Fitting Room',
     ].filter(Boolean);
 
     return (
@@ -273,7 +273,7 @@ function RequirementsForm({ onComplete, disabled }) {
             { key: 'has_storage',       label: 'Storage Room',            note: '2000×1800 mm' },
             { key: 'has_electrical',    label: 'Electrical Room',         note: '1200×1000 mm' },
             { key: 'has_fr_room',       label: 'FR Room (Franchisee)',    note: '2400×2000 mm' },
-            { key: 'has_fitting_rooms', label: 'Fitting Room(s)',         note: '1200×1200 mm ×2' },
+            { key: 'has_fitting_rooms', label: 'Fitting Room',           note: '1200×1200 mm' },
           ].map(({ key, label, note }) => (
             <label key={key} className="req-check-label req-check-label-wide">
               <input

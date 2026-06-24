@@ -456,22 +456,32 @@ def ai_layout_dxf():
         for fname, cnt in _fix_counts.items():
             _logger.info(f"  [{cnt}x] {fname}")
 
-        # Log BOH rooms requested
-        _boh_requested = []
-        if requirements.get('has_fitting_lab', True):   _boh_requested.append('FITTING LAB 1370x1830')
-        if requirements.get('has_toilet', True):         _boh_requested.append('TOILET / WASH ROOM')
-        if requirements.get('has_pantry', True):         _boh_requested.append('PANTRY')
-        if requirements.get('has_fitting_rooms', True):  _boh_requested.extend(['FITTING ROOM 1','FITTING ROOM 2'])
-        if requirements.get('has_fr_room', True):        _boh_requested.append('FR ROOM (FRANCHISEE)')
-        if requirements.get('has_storage', True):        _boh_requested.append('STORAGE ROOM')
-        if requirements.get('has_electrical', True):     _boh_requested.append('ELECTRICAL ROOM')
+        # Log BOH rooms requested. Clinic rooms are tracked separately from
+        # BOH here for clarity — they're combined into one _boh_requested
+        # list below only because the AI placement filter needs both in a
+        # single allowed-names set.
+        _boh_only = []
+        if requirements.get('has_fitting_lab', True):   _boh_only.append('FITTING LAB 1370x1830')
+        if requirements.get('has_toilet', True):         _boh_only.append('TOILET / WASH ROOM')
+        if requirements.get('has_pantry', True):         _boh_only.append('PANTRY')
+        if requirements.get('has_fitting_rooms', True):  _boh_only.append('FITTING ROOM')
+        if requirements.get('has_fr_room', True):        _boh_only.append('FR ROOM (FRANCHISEE)')
+        if requirements.get('has_storage', True):        _boh_only.append('STORAGE ROOM')
+        if requirements.get('has_electrical', True):     _boh_only.append('ELECTRICAL ROOM')
         _clinic_count = int(requirements.get('clinic_count', 2))
         _clinic_type  = requirements.get('clinic_type', 'PHOROPTER')
-        for i in range(_clinic_count):
-            _boh_requested.append(f"{'PHOROPTER' if _clinic_type=='PHOROPTER' else 'NORMAL'} CLINIC ROOM {i+1}")
+        _clinic_only = [
+            f"{'PHOROPTER' if _clinic_type=='PHOROPTER' else 'NORMAL'} CLINIC ROOM {i+1}"
+            for i in range(_clinic_count)
+        ]
+        _boh_requested = _boh_only + _clinic_only
 
-        _logger.info(f"BOH/Clinic rooms requested ({len(_boh_requested)} total):")
-        for rname in _boh_requested:
+        _logger.info(f"BOH rooms requested ({len(_boh_only)} room instances "
+                     f"from {sum(1 for k in ('has_fitting_lab','has_toilet','has_pantry','has_fitting_rooms','has_fr_room','has_storage','has_electrical') if requirements.get(k, True))} categories checked):")
+        for rname in _boh_only:
+            _logger.info(f"  - {rname}")
+        _logger.info(f"Clinic rooms requested ({len(_clinic_only)} total):")
+        for rname in _clinic_only:
             _logger.info(f"  - {rname}")
         _logger.info("-" * 70)
 
@@ -665,8 +675,7 @@ def ai_layout_dxf():
                 if requirements.get('has_pantry', True):
                     boh_room_defs.append(('PANTRY', 1800, 1500, 2800))
                 if requirements.get('has_fitting_rooms', True):
-                    boh_room_defs.append(('FITTING ROOM 1', 1200, 1200, 2800))
-                    boh_room_defs.append(('FITTING ROOM 2', 1200, 1200, 2800))
+                    boh_room_defs.append(('FITTING ROOM', 1200, 1200, 2800))
                 if requirements.get('has_fr_room', True):
                     boh_room_defs.append(('FR ROOM (FRANCHISEE)', 2400, 2000, 2800))
                 if requirements.get('has_storage', True):
@@ -1084,7 +1093,7 @@ def ai_layout_dxf():
                 if requirements.get('has_fitting_lab', True):   _boh_defs2.append(('FITTING LAB 1370x1830', 1370, 1830))
                 if requirements.get('has_toilet', True):         _boh_defs2.append(('TOILET / WASH ROOM', 1500, 1800))
                 if requirements.get('has_pantry', True):         _boh_defs2.append(('PANTRY', 1800, 1500))
-                if requirements.get('has_fitting_rooms', True):  _boh_defs2.extend([('FITTING ROOM 1', 1200, 1200), ('FITTING ROOM 2', 1200, 1200)])
+                if requirements.get('has_fitting_rooms', True):  _boh_defs2.append(('FITTING ROOM', 1200, 1200))
                 if requirements.get('has_fr_room', True):        _boh_defs2.append(('FR ROOM (FRANCHISEE)', 2400, 2000))
                 if requirements.get('has_storage', True):        _boh_defs2.append(('STORAGE ROOM', 2000, 1800))
                 if requirements.get('has_electrical', True):     _boh_defs2.append(('ELECTRICAL ROOM', 1200, 1000))
