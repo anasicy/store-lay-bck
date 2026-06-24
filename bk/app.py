@@ -893,6 +893,11 @@ def ai_layout_dxf():
                 }
                 _WALL_THRESHOLD = W * 0.25  # within 25% of store width = near a wall
 
+                # _in_store() (used by _fits) rejects anything below margin=100,
+                # so every wall-anchor coordinate here MUST use that same
+                # margin — a 50mm anchor makes _fits() always return False.
+                _WALL_MARGIN = 100
+
                 def _slide_along_wall(p, fw, fd, fixed_x, target_y, step=150):
                     """Search up/down from target_y for a free slot at fixed_x."""
                     if _fits(p, fixed_x, target_y, fw, fd):
@@ -900,7 +905,7 @@ def ai_layout_dxf():
                     offset = step
                     while offset <= D:
                         for cand_y in (target_y - offset, target_y + offset):
-                            cand_y = max(50, min(cand_y, int(D - fd - 50)))
+                            cand_y = max(_WALL_MARGIN, min(cand_y, int(D - fd - _WALL_MARGIN)))
                             if _fits(p, fixed_x, cand_y, fw, fd):
                                 return cand_y
                         offset += step
@@ -921,8 +926,8 @@ def ai_layout_dxf():
                     if near_left or near_right:
                         # Switch to rotation=90: long side (l) runs along Y axis
                         # effective_w = d (depth), effective_d = l (length)
-                        new_x = 50 if near_left else int(W - pd - 50)
-                        target_y = max(50, min(p['y'], int(D - pl - 50)))
+                        new_x = _WALL_MARGIN if near_left else int(W - pd - _WALL_MARGIN)
+                        target_y = max(_WALL_MARGIN, min(p['y'], int(D - pl - _WALL_MARGIN)))
                         new_y = _slide_along_wall(p, pd, pl, new_x, target_y)
                         if new_y is not None:
                             p['rotation'] = 90
@@ -933,7 +938,7 @@ def ai_layout_dxf():
                 # --- 4b. Wall-snap pass: force wall fixtures to actual walls --
                 # If a wall fixture is NOT near any wall (floating in center),
                 # snap it to the nearest wall based on its x position.
-                _WALL_SNAP_MARGIN = 50   # mm from wall face
+                _WALL_SNAP_MARGIN = _WALL_MARGIN   # must match _in_store()'s margin=100
 
                 def _slide_along_wall_h(p, fw, fd, fixed_y, target_x, step=150):
                     """Search left/right from target_x for a free slot at fixed_y."""
@@ -942,7 +947,7 @@ def ai_layout_dxf():
                     offset = step
                     while offset <= W:
                         for cand_x in (target_x - offset, target_x + offset):
-                            cand_x = max(50, min(cand_x, int(W - fw - 50)))
+                            cand_x = max(_WALL_MARGIN, min(cand_x, int(W - fw - _WALL_MARGIN)))
                             if _fits(p, cand_x, fixed_y, fw, fd):
                                 return cand_x
                         offset += step

@@ -30,8 +30,6 @@ const DEFAULT = {
   store_tier:         'PREMIUM',
   walkway_width:      1500,
   checkout_count:     1,
-  // Glazing + orientation
-  north_direction:    'FRONT',
   bay_big_side:       'LEFT',
   // Clinic
   clinic_count:       2,
@@ -44,12 +42,12 @@ const DEFAULT = {
   has_storage:        true,
   has_electrical:     true,
   has_fr_room:        true,
-  has_fitting_rooms:  true,
   // Structural
   ceiling_height:     3000,
   has_pillar_line:    false,
   pillar_line_axis:   'X',
-  // Legacy (kept for backward compat)
+  // Always overridden server-side from the detected door position —
+  // this default only matters before that response arrives.
   entrance_wall:      'FRONT',
   has_kids_section:   false,
   has_contact_lens_bar: false,
@@ -64,12 +62,9 @@ function RequirementsForm({ onComplete, disabled }) {
   const set = (key, val) => setReq(r => ({ ...r, [key]: val }));
 
   const handleConfirm = () => {
-    // Sync entrance_wall with north_direction for backward compat
-    const updated = { ...req, entrance_wall: req.north_direction };
-    setReq(updated);
     setConfirmed(true);
     setEditing(false);
-    onComplete(updated);
+    onComplete(req);
   };
 
   // ── Summary card ──────────────────────────────────────────────────────────
@@ -89,7 +84,6 @@ function RequirementsForm({ onComplete, disabled }) {
       req.has_storage       && 'Storage',
       req.has_electrical    && 'Electrical Room',
       req.has_fr_room       && 'FR Room',
-      req.has_fitting_rooms && 'Fitting Rooms',
     ].filter(Boolean);
 
     return (
