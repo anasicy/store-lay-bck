@@ -3,7 +3,7 @@ import json
 from openai import OpenAI
 
 TITAN_GATEWAY_URL = "https://ai.titan.in/gateway"
-AI_MODEL = os.environ.get("TITAN_MODEL", "azure/gpt-4o")
+AI_MODEL = os.environ.get("TITAN_MODEL", "azure/gpt-5-mini")
 
 _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 
