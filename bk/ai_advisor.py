@@ -5,6 +5,16 @@ from openai import OpenAI
 TITAN_GATEWAY_URL = "https://ai.titan.in/gateway"
 AI_MODEL = os.environ.get("TITAN_MODEL", "azure/gpt-5-mini")
 
+# ── Compass: entrance wall is always South ──────────────────────────────────
+# Standing at the entrance facing into the store, left = West, right = East,
+# opposite wall = North. There is no independent "north direction" setting —
+# it is always derived from the entrance wall. Kept in sync with the
+# identical mapping in app.py (can't import across — app.py imports this
+# module, not the other way).
+_OPPOSITE_WALL = {'FRONT': 'BACK', 'BACK': 'FRONT', 'LEFT': 'RIGHT', 'RIGHT': 'LEFT'}
+_WEST_OF_ENTRANCE = {'FRONT': 'LEFT', 'BACK': 'RIGHT', 'LEFT': 'BACK', 'RIGHT': 'FRONT'}
+_EAST_OF_ENTRANCE = {'FRONT': 'RIGHT', 'BACK': 'LEFT', 'LEFT': 'FRONT', 'RIGHT': 'BACK'}
+
 _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 
 
@@ -143,7 +153,7 @@ def get_ai_explanation(placements: list, requirements: dict,
     walkway   = requirements.get('walkway_width', 1500)
     clinics   = requirements.get('clinic_count', 2)
     clinic_t  = requirements.get('clinic_type', 'PHOROPTER')
-    north     = requirements.get('north_direction', 'FRONT')
+    north     = _OPPOSITE_WALL.get(entrance, 'BACK')
     ceiling   = requirements.get('ceiling_height', 3000)
 
     prompt = f"""You are a Titan Eyewear store layout consultant.
@@ -231,7 +241,6 @@ FIXTURE_LIBRARY_JSON = """[
   {"code":"STORAGE","name":"STORAGE ROOM","L_mm":2000,"D_mm":1800,"H_mm":2800,"zone":"BOH","type":"room"},
   {"code":"ELEC_ROOM","name":"ELECTRICAL ROOM","L_mm":1200,"D_mm":1000,"H_mm":2800,"zone":"BOH","type":"room"},
   {"code":"FR_ROOM","name":"FR ROOM (FRANCHISEE)","L_mm":2400,"D_mm":2000,"H_mm":2800,"zone":"BOH","type":"room"},
-  {"code":"FITTING_ROOM","name":"FITTING ROOM","L_mm":1200,"D_mm":1200,"H_mm":2800,"zone":"BOH","type":"room"},
   {"code":"PSTOR_2W_911","name":"PREM STORAGE TWO WAY - 0.91W","L_mm":911,"D_mm":700,"H_mm":700,"zone":"BOH","type":"floor"},
   {"code":"PSTOR_1W_911","name":"PREM STORAGE ONE WAY - 0.91W","L_mm":911,"D_mm":700,"H_mm":700,"zone":"BOH","type":"floor"}
 ]"""
@@ -376,7 +385,7 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     branch_name       = requirements.get('branch_name', 'Titan Eyewear')
     store_tier        = requirements.get('store_tier', 'PREMIUM')
     entrance_wall     = requirements.get('entrance_wall', 'FRONT')
-    north_dir         = requirements.get('north_direction', 'FRONT')
+    north_dir         = _OPPOSITE_WALL.get(entrance_wall, 'BACK')
     walkway_w         = requirements.get('walkway_width', 1500)
     clinic_count      = requirements.get('clinic_count', 2)
     clinic_type       = requirements.get('clinic_type', 'PHOROPTER')
@@ -390,11 +399,8 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     has_storage       = requirements.get('has_storage', True)
     has_electrical    = requirements.get('has_electrical', True)
     has_fr_room       = requirements.get('has_fr_room', True)
-    has_fitting_rooms = requirements.get('has_fitting_rooms', True)
 
     min_spacing    = constraints.get('minSpacing', 900)
-
-    has_cash_counter = any('cash counter' in f['name'].lower() for f in selected_fixtures)
 
     has_cash_counter = any('cash counter' in f['name'].lower() for f in selected_fixtures)
 
@@ -408,7 +414,6 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     if has_fitting_lab:   boh_rooms.append({"name": "FITTING LAB 1370x1830",       "l_mm": 1370, "d_mm": 1830, "zone": "FITTING_LAB"})
     if has_toilet:        boh_rooms.append({"name": "TOILET / WASH ROOM",           "l_mm": 1500, "d_mm": 1800, "zone": "BOH"})
     if has_pantry:        boh_rooms.append({"name": "PANTRY",                        "l_mm": 1800, "d_mm": 1500, "zone": "BOH"})
-    if has_fitting_rooms: boh_rooms.append({"name": "FITTING ROOM",                 "l_mm": 1200, "d_mm": 1200, "zone": "BOH"})
     if has_fr_room:       boh_rooms.append({"name": "FR ROOM (FRANCHISEE)",          "l_mm": 2400, "d_mm": 2000, "zone": "BOH"})
     if has_storage:       boh_rooms.append({"name": "STORAGE ROOM",                  "l_mm": 2000, "d_mm": 1800, "zone": "BOH"})
     if has_electrical:    boh_rooms.append({"name": "ELECTRICAL ROOM",               "l_mm": 1200, "d_mm": 1000, "zone": "BOH"})
@@ -433,14 +438,15 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
         if has_pillar_line else "No pillar line."
     )
 
-    # Derive SW corner description for Vastu
+    # Derive SW corner description for Vastu — keyed by entrance_wall
+    # (South), not north_dir, since entrance is always South.
     sw_map = {
         'FRONT': 'bottom-left corner (x≈0, y≈0)',
         'BACK':  'top-right corner (x≈store_w, y≈store_d)',
-        'LEFT':  'bottom-right corner (x≈store_w, y≈0)',
-        'RIGHT': 'top-left corner (x≈0, y≈store_d)',
+        'LEFT':  'top-left corner (x≈0, y≈store_d)',
+        'RIGHT': 'bottom-right corner (x≈store_w, y≈0)',
     }
-    sw_desc = sw_map.get(north_dir, 'bottom-left corner (x≈0, y≈0)')
+    sw_desc = sw_map.get(entrance_wall, 'bottom-left corner (x≈0, y≈0)')
 
     # Entrance wall → which edge y=0 / y=store_d / x=0 / x=store_w
     entrance_edge_map = {
@@ -766,7 +772,7 @@ def get_ai_layout_positions(store_boundary, selected_fixtures, constraints,
     branch_name    = requirements.get('branch_name', 'Titan Eyewear')
     store_tier     = requirements.get('store_tier', 'PREMIUM')
     entrance_wall  = requirements.get('entrance_wall', 'FRONT')
-    north_dir      = requirements.get('north_direction', 'FRONT')
+    north_dir      = _OPPOSITE_WALL.get(entrance_wall, 'BACK')
     walkway_w      = requirements.get('walkway_width', 1500)
     checkout_count = requirements.get('checkout_count', 1)
     clinic_count   = requirements.get('clinic_count', 2)
@@ -896,8 +902,7 @@ Return ONLY valid JSON — no markdown, no explanation:
     {{"category": "BOH Rooms", "item": "PANTRY (1800×1500 mm)", "recommended_qty": <int>, "reason": "<one sentence>"}},
     {{"category": "BOH Rooms", "item": "STORAGE ROOM (2000×1800 mm)", "recommended_qty": <int>, "reason": "<one sentence>"}},
     {{"category": "BOH Rooms", "item": "ELECTRICAL ROOM (1200×1000 mm)", "recommended_qty": <int>, "reason": "<one sentence>"}},
-    {{"category": "BOH Rooms", "item": "FR ROOM FRANCHISEE (2400×2000 mm)", "recommended_qty": <int>, "reason": "<one sentence>"}},
-    {{"category": "BOH Rooms", "item": "FITTING ROOM (1200×1200 mm)", "recommended_qty": <int>, "reason": "<one sentence>"}}
+    {{"category": "BOH Rooms", "item": "FR ROOM FRANCHISEE (2400×2000 mm)", "recommended_qty": <int>, "reason": "<one sentence>"}}
   ],
   "summary": "<2-3 sentences summarising the store capacity and key constraints>"
 }}"""

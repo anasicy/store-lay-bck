@@ -30,6 +30,48 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# ── Compass: entrance wall is always South ──────────────────────────────────
+# Standing at the entrance facing into the store, left = West, right = East,
+# and the opposite wall = North. This is the single source of truth for
+# every compass-relative calculation (Vastu SW corner, AI prompt wording,
+# frontend compass overlay) — there is no independent "north direction"
+# setting; it is always derived from the entrance wall.
+_OPPOSITE_WALL = {'FRONT': 'BACK', 'BACK': 'FRONT', 'LEFT': 'RIGHT', 'RIGHT': 'LEFT'}
+_WEST_OF_ENTRANCE = {'FRONT': 'LEFT', 'BACK': 'RIGHT', 'LEFT': 'BACK', 'RIGHT': 'FRONT'}
+_EAST_OF_ENTRANCE = {'FRONT': 'RIGHT', 'BACK': 'LEFT', 'LEFT': 'FRONT', 'RIGHT': 'BACK'}
+
+
+def compass_from_entrance(entrance_wall):
+    """Return {south, north, west, east: <FRONT|BACK|LEFT|RIGHT wall>} for a given entrance wall."""
+    entrance_wall = entrance_wall if entrance_wall in _OPPOSITE_WALL else 'FRONT'
+    return {
+        'south': entrance_wall,
+        'north': _OPPOSITE_WALL[entrance_wall],
+        'west': _WEST_OF_ENTRANCE[entrance_wall],
+        'east': _EAST_OF_ENTRANCE[entrance_wall],
+    }
+
+
+def _detect_entrance_wall(doors, bounds):
+    """
+    Infer which store wall (FRONT=y_min, BACK=y_max, LEFT=x_min, RIGHT=x_max)
+    the real entrance is on, from the door(s) detected in the DXF. Falls back
+    to FRONT only when no door was detected at all.
+    """
+    if not doors:
+        return 'FRONT'
+    min_x, min_y = bounds['min']
+    max_x, max_y = bounds['max']
+    door = doors[0]
+    dx, dy = door['x'], door['y']
+    dist_to_wall = {
+        'FRONT': dy - min_y,
+        'BACK':  max_y - dy,
+        'LEFT':  dx - min_x,
+        'RIGHT': max_x - dx,
+    }
+    return min(dist_to_wall, key=dist_to_wall.get)
+
 # ── existing endpoints (unchanged) ──────────────────────────────────────────
 
 @app.route('/list-models', methods=['GET'])
@@ -435,6 +477,12 @@ def ai_layout_dxf():
         store_w = bounds['max'][0] - bounds['min'][0]
         store_d = bounds['max'][1] - bounds['min'][1]
 
+        # ── Entrance wall: ALWAYS derived from the actual detected door,
+        # never from a manual setting. The entrance wall is treated as
+        # South; standing at it facing into the store, left = West,
+        # right = East (see _detect_entrance_wall / compass mapping below).
+        requirements['entrance_wall'] = _detect_entrance_wall(layout_doors, bounds)
+
         # ── Detailed terminal logging ──────────────────────────────────────
         import logging as _log
         _log.basicConfig(level=_log.INFO, format='%(asctime)s [LAYOUT] %(message)s',
@@ -464,7 +512,6 @@ def ai_layout_dxf():
         if requirements.get('has_fitting_lab', True):   _boh_only.append('FITTING LAB 1370x1830')
         if requirements.get('has_toilet', True):         _boh_only.append('TOILET / WASH ROOM')
         if requirements.get('has_pantry', True):         _boh_only.append('PANTRY')
-        if requirements.get('has_fitting_rooms', True):  _boh_only.append('FITTING ROOM')
         if requirements.get('has_fr_room', True):        _boh_only.append('FR ROOM (FRANCHISEE)')
         if requirements.get('has_storage', True):        _boh_only.append('STORAGE ROOM')
         if requirements.get('has_electrical', True):     _boh_only.append('ELECTRICAL ROOM')
@@ -477,7 +524,7 @@ def ai_layout_dxf():
         _boh_requested = _boh_only + _clinic_only
 
         _logger.info(f"BOH rooms requested ({len(_boh_only)} room instances "
-                     f"from {sum(1 for k in ('has_fitting_lab','has_toilet','has_pantry','has_fitting_rooms','has_fr_room','has_storage','has_electrical') if requirements.get(k, True))} categories checked):")
+                     f"from {sum(1 for k in ('has_fitting_lab','has_toilet','has_pantry','has_fr_room','has_storage','has_electrical') if requirements.get(k, True))} categories checked):")
         for rname in _boh_only:
             _logger.info(f"  - {rname}")
         _logger.info(f"Clinic rooms requested ({len(_clinic_only)} total):")
@@ -674,8 +721,6 @@ def ai_layout_dxf():
                     boh_room_defs.append(('TOILET / WASH ROOM', 1500, 1800, 2800))
                 if requirements.get('has_pantry', True):
                     boh_room_defs.append(('PANTRY', 1800, 1500, 2800))
-                if requirements.get('has_fitting_rooms', True):
-                    boh_room_defs.append(('FITTING ROOM', 1200, 1200, 2800))
                 if requirements.get('has_fr_room', True):
                     boh_room_defs.append(('FR ROOM (FRANCHISEE)', 2400, 2000, 2800))
                 if requirements.get('has_storage', True):
@@ -803,7 +848,7 @@ def ai_layout_dxf():
                 boh_zone = _zones.get('BOH')
                 _BOH_NAMES = {
                     'fitting lab', 'toilet', 'wash room', 'pantry',
-                    'fitting room', 'fr room', 'franchisee', 'storage room',
+                    'fr room', 'franchisee', 'storage room',
                     'electrical room',
                 }
                 if boh_zone:
@@ -1093,7 +1138,6 @@ def ai_layout_dxf():
                 if requirements.get('has_fitting_lab', True):   _boh_defs2.append(('FITTING LAB 1370x1830', 1370, 1830))
                 if requirements.get('has_toilet', True):         _boh_defs2.append(('TOILET / WASH ROOM', 1500, 1800))
                 if requirements.get('has_pantry', True):         _boh_defs2.append(('PANTRY', 1800, 1500))
-                if requirements.get('has_fitting_rooms', True):  _boh_defs2.append(('FITTING ROOM', 1200, 1200))
                 if requirements.get('has_fr_room', True):        _boh_defs2.append(('FR ROOM (FRANCHISEE)', 2400, 2000))
                 if requirements.get('has_storage', True):        _boh_defs2.append(('STORAGE ROOM', 2000, 1800))
                 if requirements.get('has_electrical', True):     _boh_defs2.append(('ELECTRICAL ROOM', 1200, 1000))
@@ -1260,6 +1304,8 @@ def ai_layout_dxf():
                 'polygon': store_boundary.get('polygon'),
                 'bounds': store_boundary['bounds'],
             },
+            'entrance_wall': requirements['entrance_wall'],
+            'compass': compass_from_entrance(requirements['entrance_wall']),
         }
         if ai_error:
             response_data['ai_placement_error'] = ai_error

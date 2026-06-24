@@ -1281,12 +1281,42 @@ body {
 
 /* ── Layout view wrapper ──────────────────────────────────────────────────── */
 .layout-view-wrapper {
+  position: relative;
   border: 2px solid #c7d2fe;
   border-radius: 10px;
   overflow: hidden;
   background: #fafbff;
   margin-bottom: 0.75rem;
 }
+.compass-widget {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 64px;
+  height: 64px;
+  z-index: 5;
+  pointer-events: none;
+}
+.compass-circle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #94a3b8;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+.compass-label {
+  position: absolute;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+.compass-label.compass-pos-top    { top: 2px; left: 50%; transform: translateX(-50%); }
+.compass-label.compass-pos-bottom { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.compass-label.compass-pos-left   { top: 50%; left: 4px; transform: translateY(-50%); }
+.compass-label.compass-pos-right  { top: 50%; right: 4px; transform: translateY(-50%); }
+.compass-label.compass-is-north   { color: #dc2626; }
 .layout-preview-svg {
   display: block;
   background: white;

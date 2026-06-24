@@ -699,6 +699,36 @@ function ZoneLegend({ placements, columns = [], beams = [], doors = [] }) {
   );
 }
 
+// ── Compass overlay ────────────────────────────────────────────────────────────
+// The entrance wall is always South. In the 2D/3D layout views, world Y=min
+// (FRONT wall) renders at screen-bottom and Y=max (BACK) at screen-top;
+// X=min (LEFT) renders at screen-left and X=max (RIGHT) at screen-right.
+const WALL_TO_SCREEN_POS = { FRONT: 'bottom', BACK: 'top', LEFT: 'left', RIGHT: 'right' };
+
+function Compass({ compass }) {
+  if (!compass) return null;
+  const posOf = dir => WALL_TO_SCREEN_POS[compass[dir]] || dir;
+  const dirAtPos = {};
+  dirAtPos[posOf('north')] = 'N';
+  dirAtPos[posOf('south')] = 'S';
+  dirAtPos[posOf('west')]  = 'W';
+  dirAtPos[posOf('east')]  = 'E';
+  return (
+    <div className="compass-widget" title="Entrance is always South">
+      <div className="compass-circle">
+        {['top', 'bottom', 'left', 'right'].map(pos => (
+          <span
+            key={pos}
+            className={`compass-label compass-pos-${pos}${dirAtPos[pos] === 'N' ? ' compass-is-north' : ''}`}
+          >
+            {dirAtPos[pos]}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Variant tab bar ───────────────────────────────────────────────────────────
 function VariantTabs({ variants, activeIdx, onSelect }) {
   if (!variants?.length) return null;
@@ -786,6 +816,7 @@ function App() {
   const [layoutVariants, setLayoutVariants] = useState([]);
   const [activeVariant, setActiveVariant] = useState(0);
   const [storeBoundary, setStoreBoundary] = useState(null);
+  const [compass, setCompass] = useState(null);
   const [aiExplanation, setAiExplanation] = useState('');
   const [aiLayoutConcept, setAiLayoutConcept] = useState(null);
   const [skippedFixtures, setSkippedFixtures] = useState([]);
@@ -918,6 +949,10 @@ function App() {
       }
       setLayoutVariants(data.variants || []);
       setStoreBoundary(data.store_boundary);
+      setCompass(data.compass || null);
+      if (data.entrance_wall) {
+        setRequirements(r => r ? { ...r, entrance_wall: data.entrance_wall } : r);
+      }
       setAiExplanation(data.ai_explanation || '');
       setAiLayoutConcept(data.ai_layout_concept || null);
       setSkippedFixtures(data.skipped_fixtures || []);
@@ -1226,6 +1261,7 @@ function App() {
                 <ZoneLegend placements={placements} columns={columns} beams={beams} doors={doors} />
 
                 <div className="layout-view-wrapper">
+                  <Compass compass={compass} />
                   {viewMode === '2d'
                     ? <Layout2DEdit
                         placements={placements}

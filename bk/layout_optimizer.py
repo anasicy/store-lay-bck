@@ -177,8 +177,6 @@ class GridLayoutEngine:
     ELEC_D     = 1000
     FR_ROOM_W  = 2400
     FR_ROOM_D  = 2000
-    FITTING_ROOM_W = 1200
-    FITTING_ROOM_D = 1200
 
     def __init__(self, store_boundary: Dict, requirements: Dict, fixtures: List[Dict],
                  doors: List[Dict] = None, columns: List[Dict] = None):
@@ -205,9 +203,7 @@ class GridLayoutEngine:
         self.has_storage    = requirements.get('has_storage', True)
         self.has_electrical = requirements.get('has_electrical', True)
         self.has_fr_room    = requirements.get('has_fr_room', True)
-        self.has_fitting_rooms = requirements.get('has_fitting_rooms', True)
         self.ceiling_height = int(requirements.get('ceiling_height', 3000))
-        self.north_direction = requirements.get('north_direction', 'FRONT')  # which wall faces North
         self.bay_big_side   = requirements.get('bay_big_side', 'LEFT')   # LEFT | RIGHT (within frontage)
         self.has_pillar_line = requirements.get('has_pillar_line', False)
         self.pillar_line_axis = requirements.get('pillar_line_axis', 'X')  # X (horizontal) | Y (vertical)
@@ -261,29 +257,23 @@ class GridLayoutEngine:
     def _sw_corner(self) -> Tuple[float, float]:
         """
         Return (x, y) of the South-West corner in store coordinates.
-        'South' = the wall opposite to North.
-        North direction maps to which wall faces North:
-          FRONT  → North is at y=D (top), South is y=0 (bottom), West is x=0 (left)
-          BACK   → North is at y=0, South is y=D, West is x=W (right in plan)
-          LEFT   → North is at x=0, South is x=W, West is y=0
-          RIGHT  → North is at x=W, South is x=0, West is y=D
-        For simplicity we use the most common Titan store orientation:
-          glazing = North-facing → South-West = bottom-left = (0, 0)
+
+        The entrance wall is ALWAYS South. Standing at the entrance facing
+        into the store, left = West, right = East, and the opposite wall
+        = North:
+          entrance=FRONT (y=0)   → South=y=0, North=y=D, West=x=0,   East=x=W   → SW=(0,0)
+          entrance=BACK  (y=D)   → South=y=D, North=y=0, West=x=W,   East=x=0   → SW=(W,D)
+          entrance=LEFT  (x=0)   → South=x=0, North=x=W, West=y=D,   East=y=0   → SW=(0,D)
+          entrance=RIGHT (x=W)   → South=x=W, North=x=0, West=y=0,   East=y=D   → SW=(W,0)
         """
         W, D = self.store_w, self.store_d
-        nd = self.north_direction
-        if nd == 'FRONT':
-            # North = top (y=D), South = bottom (y=0), West = left (x=0)
-            return (0.0, 0.0)
-        elif nd == 'BACK':
-            # North = bottom (y=0), South = top (y=D), West = right (x=W)
-            return (W, D)
-        elif nd == 'LEFT':
-            # North = left (x=0), South = right (x=W), West = bottom (y=0)
-            return (W, 0.0)
-        else:  # RIGHT
-            # North = right (x=W), South = left (x=0), West = top (y=D)
-            return (0.0, D)
+        entrance = self.entrance_wall
+        return {
+            'FRONT': (0.0, 0.0),
+            'BACK':  (W, D),
+            'LEFT':  (0.0, D),
+            'RIGHT': (W, 0.0),
+        }.get(entrance, (0.0, 0.0))
 
     # ── Zone layout ───────────────────────────────────────────────────────────
 
@@ -301,7 +291,7 @@ class GridLayoutEngine:
           RETAIL_MID   – next 30% (core categories)
           RETAIL_PREMIUM – last 10% of retail (premium/lux, near clinic transition)
 
-        Cash counter: South-West corner (computed from north_direction).
+        Cash counter: South-West corner (computed from entrance_wall).
         """
         W, D = self.store_w, self.store_d
         margin = 300
@@ -722,7 +712,7 @@ class GridLayoutEngine:
     def _place_cash_counter(self, placements: List[Dict], cash_fixtures: List[Dict]):
         """
         Place cash counter in the South-West corner facing North or East (Vastu).
-        SW corner is derived from north_direction.
+        SW corner is derived from entrance_wall (entrance is always South).
         """
         if not cash_fixtures:
             return
@@ -837,10 +827,6 @@ class GridLayoutEngine:
             _try_place('TOILET / WASH ROOM', self.TOILET_W, self.TOILET_D)
         if self.has_pantry:
             _try_place('PANTRY', self.PANTRY_W, self.PANTRY_D)
-
-        # Fitting room
-        if self.has_fitting_rooms:
-            _try_place('FITTING ROOM', self.FITTING_ROOM_W, self.FITTING_ROOM_D)
 
         # FR room (franchisee)
         if self.has_fr_room:
