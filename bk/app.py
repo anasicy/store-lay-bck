@@ -3,7 +3,6 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
 import uuid
-import json
 from dotenv import load_dotenv
 from openai import OpenAI
 from dxf_processor import DXFProcessor
@@ -197,7 +196,6 @@ def debug_boundary(file_id):
     if not os.path.exists(input_path):
         return jsonify({'error': 'File not found'}), 404
     try:
-        import ezdxf
         from collections import defaultdict
         processor = DXFProcessor(input_path)
         # ── Raw DXF diagnostics ──────────────────────────────────────────────
@@ -550,7 +548,7 @@ def ai_layout_dxf():
             _bmin = store_boundary['bounds']['min']
             if _raw_polygon and len(_raw_polygon) >= 3:
                 try:
-                    from shapely.geometry import Polygon as _SPoly, box as _SBox
+                    from shapely.geometry import Polygon as _SPoly
                     _norm_pts = [
                         (pt[0] - _bmin[0], pt[1] - _bmin[1])
                         for pt in _raw_polygon
@@ -886,7 +884,6 @@ def ai_layout_dxf():
                 # If a wall fixture is NOT near any wall (floating in center),
                 # snap it to the nearest wall based on its x position.
                 _WALL_SNAP_MARGIN = 50   # mm from wall face
-                _RETAIL_Y_MAX = D * 0.80  # don't snap into clinic/BOH zone
 
                 def _slide_along_wall_h(p, fw, fd, fixed_y, target_x, step=150):
                     """Search left/right from target_x for a free slot at fixed_y."""
@@ -1297,7 +1294,6 @@ def _generate_layout_pdf(placements, store_boundary, requirements,
     """Draw store layout as a PDF using reportlab."""
     from reportlab.lib.pagesizes import A3, landscape
     from reportlab.pdfgen import canvas as rl_canvas
-    from reportlab.lib.units import mm
     from reportlab.lib import colors
 
     page_w, page_h = landscape(A3)  # ~1190 × 842 points

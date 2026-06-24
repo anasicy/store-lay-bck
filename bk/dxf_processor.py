@@ -1,12 +1,12 @@
 import os
+from typing import Optional
 import ezdxf
 from ezdxf import bbox as ezdxf_bbox
-import numpy as np
 
 class DXFProcessor:
     def __init__(self, filepath):
         self.filepath = filepath
-        self.doc = ezdxf.readfile(filepath)
+        self.doc = ezdxf.readfile(filepath)  # type: ignore[reportPrivateImportUsage]
         self.msp = self.doc.modelspace()
     
     def get_metadata(self):
@@ -61,7 +61,7 @@ class DXFProcessor:
                 entity_info['radius'] = entity.dxf.radius
             
             elif entity.dxftype() in ['LWPOLYLINE', 'POLYLINE']:
-                entity_info['points'] = [(p[0], p[1]) for p in entity.get_points()]
+                entity_info['points'] = [(p[0], p[1]) for p in entity.get_points()]  # type: ignore[reportAttributeAccessIssue]
             
             entities_data.append({
                 'entity': entity,
@@ -95,7 +95,7 @@ class DXFProcessor:
         for entity in self.msp:
             if entity.dxftype() == 'INSERT':
                 try:
-                    for ve in entity.virtual_entities():
+                    for ve in entity.virtual_entities():  # type: ignore[reportAttributeAccessIssue]
                         yield ve
                 except Exception:
                     pass
@@ -129,7 +129,7 @@ class DXFProcessor:
                     is_closed = (getattr(entity, 'closed', False) or
                                  bool(entity.dxf.get('flags', 0) & 1))
                     pts = [(p[0] * scale, p[1] * scale)
-                           for p in entity.get_points()]
+                           for p in entity.get_points()]  # type: ignore[reportAttributeAccessIssue]
                     if len(pts) >= 3:
                         if not is_closed:
                             dx = pts[-1][0] - pts[0][0]
@@ -207,7 +207,7 @@ class DXFProcessor:
             except Exception:
                 hull = mp.convex_hull
             if hasattr(hull, 'exterior'):
-                coords = list(hull.exterior.coords)
+                coords = list(hull.exterior.coords)  # type: ignore[reportAttributeAccessIssue]
                 xs_o = [p[0] for p in coords]
                 ys_o = [p[1] for p in coords]
                 w = max(xs_o) - min(xs_o)
@@ -391,14 +391,14 @@ class DXFProcessor:
                 is_closed = getattr(entity, 'closed', False) or bool(entity.dxf.get('flags', 0) & 1)
                 if not is_closed:
                     # Also treat as closed if last point ≈ first point
-                    pts_check = [(p[0], p[1]) for p in entity.get_points()]
+                    pts_check = [(p[0], p[1]) for p in entity.get_points()]  # type: ignore[reportAttributeAccessIssue]
                     if len(pts_check) >= 3:
                         dx = pts_check[-1][0] - pts_check[0][0]
                         dy = pts_check[-1][1] - pts_check[0][1]
                         is_closed = (dx * dx + dy * dy) < (100 * 100)
                 if not is_closed:
                     continue
-                pts = [(p[0], p[1]) for p in entity.get_points()]
+                pts = [(p[0], p[1]) for p in entity.get_points()]  # type: ignore[reportAttributeAccessIssue]
                 if len(pts) < 3:
                     continue
                 xs = [p[0] for p in pts]
@@ -611,7 +611,7 @@ class DXFProcessor:
                 is_closed = (getattr(entity, 'closed', False) or
                              bool(entity.dxf.get('flags', 0) & 1))
                 pts = [(p[0] * scale, p[1] * scale)
-                       for p in entity.get_points()]
+                       for p in entity.get_points()]  # type: ignore[reportAttributeAccessIssue]
                 if len(pts) < 3:
                     continue
                 if not is_closed:
@@ -799,7 +799,7 @@ class DXFProcessor:
         for e in self.msp:
             if e.dxftype() == 'INSERT':
                 try:
-                    sources.extend(e.virtual_entities())
+                    sources.extend(e.virtual_entities())  # type: ignore[reportAttributeAccessIssue]
                 except Exception:
                     pass
         for entity in sources:
@@ -1040,7 +1040,7 @@ class DXFProcessor:
                 is_closed = (getattr(entity, 'closed', False) or
                              bool(entity.dxf.get('flags', 0) & 1))
                 pts = [(p[0] * scale, p[1] * scale)
-                       for p in entity.get_points()]
+                       for p in entity.get_points()]  # type: ignore[reportAttributeAccessIssue]
                 if len(pts) < 3:
                     continue
                 if not is_closed:
@@ -1297,9 +1297,9 @@ class DXFProcessor:
             if entity.dxftype() != 'LWPOLYLINE':
                 continue
             try:
-                if entity.closed:
+                if entity.closed:  # type: ignore[reportAttributeAccessIssue]
                     continue
-                pts = list(entity.get_points('xyb'))  # x, y, bulge
+                pts = list(entity.get_points('xyb'))  # x, y, bulge  # type: ignore[reportAttributeAccessIssue]
                 if len(pts) < 2:
                     continue
                 layer = entity.dxf.get('layer', '0')
@@ -1454,7 +1454,7 @@ class DXFProcessor:
         """Return absolute path to the backend/fixtures/ directory."""
         return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixtures')
 
-    def _find_fixture_dxf(self, fixture_name: str, store_area_sqft: float = None):
+    def _find_fixture_dxf(self, fixture_name: str, store_area_sqft: Optional[float] = None):
         """
         Return the full path to the best-matching fixture DXF file, or None.
         Matching is case-insensitive, first-match-wins against _FIXTURE_DXF_CATALOGUE.
@@ -1509,7 +1509,7 @@ class DXFProcessor:
         Returns True on success, False on any error.
         """
         try:
-            fix_doc = ezdxf.readfile(fixture_dxf_path)
+            fix_doc = ezdxf.readfile(fixture_dxf_path)  # type: ignore[reportPrivateImportUsage]
             fix_msp = fix_doc.modelspace()
 
             # ── Collect all virtual (expanded) entities ───────────────────
@@ -1519,7 +1519,7 @@ class DXFProcessor:
             for entity in fix_msp:
                 if entity.dxftype() == 'INSERT':
                     try:
-                        all_virtual.extend(entity.virtual_entities())
+                        all_virtual.extend(entity.virtual_entities())  # type: ignore[reportAttributeAccessIssue]
                     except Exception:
                         pass
                 else:
@@ -1537,7 +1537,7 @@ class DXFProcessor:
                         xs += [ve.dxf.start.x, ve.dxf.end.x]
                         ys += [ve.dxf.start.y, ve.dxf.end.y]
                     elif vtype in ('LWPOLYLINE', 'POLYLINE'):
-                        for p in ve.get_points():
+                        for p in ve.get_points():  # type: ignore[reportAttributeAccessIssue]
                             xs.append(p[0]); ys.append(p[1])
                     elif vtype in ('ARC', 'CIRCLE'):
                         r = ve.dxf.radius
@@ -1582,7 +1582,7 @@ class DXFProcessor:
                     elif vtype in ('LWPOLYLINE', 'POLYLINE'):
                         pts = [
                             ((p[0] - fx_min_x) * sx, (p[1] - fx_min_y) * sy)
-                            for p in ve.get_points()
+                            for p in ve.get_points()  # type: ignore[reportAttributeAccessIssue]
                         ]
                         if len(pts) >= 2:
                             is_closed = (getattr(ve, 'closed', False) or
@@ -1646,7 +1646,7 @@ class DXFProcessor:
                        rectangle is drawn from the bounds.
         """
         # ── fresh document — no original content copied ───────────────────────
-        new_doc = ezdxf.new('R2010')
+        new_doc = ezdxf.new('R2010')  # type: ignore[reportPrivateImportUsage]
         new_msp = new_doc.modelspace()
 
         # Layers
@@ -1819,7 +1819,7 @@ class DXFProcessor:
         """Create new DXF file with optimized layout"""
         import ezdxf.xref as xref
 
-        new_doc = ezdxf.new('R2010')
+        new_doc = ezdxf.new('R2010')  # type: ignore[reportPrivateImportUsage]
 
         # Copy all entities, blocks, and resources from source doc
         xref.load_modelspace(self.doc, new_doc)

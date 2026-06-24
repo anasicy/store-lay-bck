@@ -1,4 +1,3 @@
-import numpy as np
 from typing import List, Dict, Tuple, Optional
 
 # ── Zone colours ──────────────────────────────────────────────────────────────
@@ -564,7 +563,6 @@ class GridLayoutEngine:
             return
         W, D = self.store_w, self.store_d
         margin = 50          # tiny margin so the fixture is truly at the wall
-        WALL_DEPTH = 600     # how far a wall fixture protrudes into the store
 
         # Track current cursor position along each wall (mm from corner)
         cursors = {'LEFT': margin, 'RIGHT': margin, 'FRONT': margin, 'BACK': margin}

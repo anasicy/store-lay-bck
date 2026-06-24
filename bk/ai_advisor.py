@@ -309,8 +309,6 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
                     for p in raw_polygon]
     norm_polygon = _simplify_polygon(norm_polygon)
 
-    is_rectangular = len(norm_polygon) == 4
-
     # Build a human-readable description of the polygon shape for the AI
     def _describe_polygon_shape(poly, sw, sd):
         """Return a plain-English description of the store shape + forbidden zones."""
@@ -380,7 +378,6 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     entrance_wall     = requirements.get('entrance_wall', 'FRONT')
     north_dir         = requirements.get('north_direction', 'FRONT')
     walkway_w         = requirements.get('walkway_width', 1500)
-    checkout_count    = requirements.get('checkout_count', 1)
     clinic_count      = requirements.get('clinic_count', 2)
     clinic_type       = requirements.get('clinic_type', 'PHOROPTER')
     ceiling_h         = requirements.get('ceiling_height', 3000)
@@ -396,7 +393,6 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     has_fitting_rooms = requirements.get('has_fitting_rooms', True)
 
     min_spacing    = constraints.get('minSpacing', 900)
-    allow_rotation = constraints.get('allowRotation', False)
 
     has_cash_counter = any('cash counter' in f['name'].lower() for f in selected_fixtures)
 
@@ -449,10 +445,10 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     entrance_edge_map = {
         'FRONT': f'y=0 edge (bottom), store depth goes from y=0 to y={store_d:.0f}',
         'BACK':  f'y={store_d:.0f} edge (top)',
-        'LEFT':  f'x=0 edge (left)',
+        'LEFT':  'x=0 edge (left)',
         'RIGHT': f'x={store_w:.0f} edge (right)',
     }
-    entrance_edge = entrance_edge_map.get(entrance_wall, f'y=0 edge (bottom)')
+    entrance_edge = entrance_edge_map.get(entrance_wall, 'y=0 edge (bottom)')
 
     # Compute explicit zone y-ranges for the prompt
     _retail_front_y2 = round(store_d * 0.20)
@@ -630,7 +626,7 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
         elif ext == '.pdf':
             user_content.append({
                 "type": "text",
-                "text": (f"Reference PDF uploaded. Use it as contextual guidance for zoning and fixture intent.")
+                "text": "Reference PDF uploaded. Use it as contextual guidance for zoning and fixture intent."
             })
 
     response = client.chat.completions.create(
@@ -852,7 +848,6 @@ def get_ai_capacity_analysis(store_boundary: dict) -> dict:
 
     store_area_m2  = store_area_mm2 / 1_000_000          # m²
     store_area_sqft = store_area_m2 * 10.7639             # sq ft
-    store_area = store_area_m2  # keep variable name for backward compat
 
     polygon = store_boundary.get('polygon') or [
         (0, 0), (store_w, 0), (store_w, store_d), (0, store_d)
