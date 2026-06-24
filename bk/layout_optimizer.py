@@ -439,12 +439,16 @@ class GridLayoutEngine:
             try:
                 from shapely.geometry import box as shapely_box
                 fix_box = shapely_box(x, y, x + w, y + d)
-                # Require at least 85% of fixture area inside the (inset) polygon
-                # This allows wall fixtures that legitimately touch the wall edge
+                # Require at least 98% of fixture area inside the (inset) polygon.
+                # The -100mm inset above already gives wall fixtures room to
+                # legitimately touch the wall edge, so no extra leniency here.
                 intersection = self._store_poly.intersection(fix_box)
                 return intersection.area >= fix_box.area * 0.98
             except Exception:
-                pass
+                # We HAVE real polygon data but the check itself failed —
+                # reject rather than silently accept; a bounding-box-only
+                # pass here is exactly how fixtures end up in cut-out notches.
+                return False
         return True
 
     def _overlaps(self, placements: List[Dict], x: float, y: float,

@@ -389,6 +389,7 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     walkway_w         = requirements.get('walkway_width', 1500)
     clinic_count      = requirements.get('clinic_count', 2)
     clinic_type       = requirements.get('clinic_type', 'PHOROPTER')
+    clinic_types      = requirements.get('clinic_types') or [clinic_type] * clinic_count
     ceiling_h         = requirements.get('ceiling_height', 3000)
     bay_big_side      = requirements.get('bay_big_side', 'LEFT')
     has_pillar_line   = requirements.get('has_pillar_line', False)
@@ -419,14 +420,18 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     if has_electrical:    boh_rooms.append({"name": "ELECTRICAL ROOM",               "l_mm": 1200, "d_mm": 1000, "zone": "BOH"})
 
     clinic_size_str = "3050 × 2440 mm" if clinic_type == 'PHOROPTER' else "2745 × 2135 mm"
-    clinic_l = 3050 if clinic_type == 'PHOROPTER' else 2745
-    clinic_d = 2440 if clinic_type == 'PHOROPTER' else 2135
 
-    clinic_rooms = [
-        {"name": f"{'PHOROPTER' if clinic_type == 'PHOROPTER' else 'NORMAL'} CLINIC ROOM {i+1}",
-         "l_mm": clinic_l, "d_mm": clinic_d, "zone": "CLINIC"}
-        for i in range(clinic_count)
-    ]
+    def _clinic_dims(ct):
+        return (3050, 2440) if ct == 'PHOROPTER' else (2745, 2135)
+
+    clinic_rooms = []
+    for i in range(clinic_count):
+        ct = clinic_types[i] if i < len(clinic_types) else clinic_type
+        cl, cd = _clinic_dims(ct)
+        clinic_rooms.append({
+            "name": f"{'PHOROPTER' if ct == 'PHOROPTER' else 'NORMAL'} CLINIC ROOM {i+1}",
+            "l_mm": cl, "d_mm": cd, "zone": "CLINIC",
+        })
 
     all_rooms_json = json.dumps(clinic_rooms + boh_rooms, indent=2)
 
@@ -753,7 +758,8 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
                 if fix_box.area > 0 and intersection.area < fix_box.area * 0.98:
                     continue  # skip this placement — mostly outside polygon
             except Exception:
-                pass  # if Shapely fails, keep the placement
+                continue  # we have real polygon data but the check failed —
+                          # reject rather than silently accept
 
         p['x'] = x
         p['y'] = y

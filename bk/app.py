@@ -639,7 +639,7 @@ def ai_layout_dxf():
                         if intersection.area < fix_box.area * 0.98:
                             return False
                     except Exception:
-                        pass  # if Shapely fails, fall through to bbox check
+                        return False  # real polygon data but check failed — reject
                 return True
 
             before = len(ai_placements)
@@ -1047,6 +1047,36 @@ def ai_layout_dxf():
                                 p['rotation'] = 0
                                 p['y'] = snap_y
                                 p['x'] = new_x
+
+                # --- 4c. Keep left/right-wall fixtures out of the CLINIC/BOH
+                # band. Passes #4/#4b only fix X (snap to wall) and rotation —
+                # they never constrain Y, so a wall fixture can end up
+                # sitting deep inside the CLINIC or BOH zone, "behind" the
+                # retail floor. Slide it back within the RETAIL zone's
+                # Y-range, along the same wall, if it has drifted north.
+                _retail_zone = _zones.get('RETAIL')
+                if _retail_zone and requirements['entrance_wall'] in ('FRONT', 'BACK'):
+                    _ry1, _ry2 = _retail_zone[2], _retail_zone[3]
+                    for p in ai_placements:
+                        pname_low = p['fixture'].lower()
+                        if not any(k in pname_low for k in _WALL_FIX_TYPES):
+                            continue
+                        if p.get('rotation', 0) not in (90, 270):
+                            continue  # only left/right-wall (vertical) fixtures run along Y
+                        fw, fd = p['d'], p['l']
+                        px, py = p['x'], p['y']
+                        on_left  = px <= 200
+                        on_right = px + fw >= W - 200
+                        if not (on_left or on_right):
+                            continue
+                        if py >= _ry1 and py + fd <= _ry2:
+                            continue  # already within the retail band
+                        target_y = max(_ry1, min(py, int(_ry2 - fd)))
+                        new_y = _slide_along_wall(p, fw, fd, px, target_y)
+                        if new_y is not None:
+                            p['y'] = new_y
+                        # else: leave as-is — better a fixture slightly out of
+                        # band than one silently dropped.
 
                 # --- 5. Door & column clearance enforcement ------------------
                 # The AI ignores door clearance zones entirely.  Build the

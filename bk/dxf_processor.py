@@ -1696,8 +1696,18 @@ class DXFProcessor:
                     dx = door['x'] - raw_min_x
                     dy = door['y'] - raw_min_y
                     r = door.get('radius', 900)
-                    sa = door.get('start_angle', 0)
-                    ea = door.get('end_angle', 90)
+                    if r < 300:
+                        continue  # degenerate/noise candidate — not a real door swing
+                    sa = door.get('start_angle', 0) % 360
+                    ea = door.get('end_angle', 90) % 360
+                    # A real door swing is a quarter-ish arc. Malformed angle
+                    # data (e.g. from a misread bulge) can produce a near-zero
+                    # or near-full-circle span, which renders as a degenerate
+                    # bowtie/cross instead of a pie — fall back to a clean
+                    # 90 degree quarter swing in that case.
+                    span = (ea - sa) % 360
+                    if span < 15 or span > 270:
+                        ea = (sa + 90) % 360
                     start_rad = math.radians(sa)
                     end_rad = math.radians(ea)
                     sx = dx + r * math.cos(start_rad)
