@@ -396,6 +396,8 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
 
     has_cash_counter = any('cash counter' in f['name'].lower() for f in selected_fixtures)
 
+    has_cash_counter = any('cash counter' in f['name'].lower() for f in selected_fixtures)
+
     fixture_list_json = json.dumps([
         {"name": f['name'], "l_mm": f['l'], "d_mm": f['d'], "h_mm": f.get('h', 1000)}
         for f in selected_fixtures
