@@ -296,15 +296,31 @@ class GridLayoutEngine:
         W, D = self.store_w, self.store_d
         margin = 300
 
-        # Depth splits (from entrance inward)
-        retail_depth  = D * 0.60
-        clinic_depth  = D * 0.25
-        boh_depth     = D * 0.15
+        # The entrance-facing axis: depth runs along Y for FRONT/BACK
+        # entrances, along X for LEFT/RIGHT entrances.
+        span = D if self.entrance_wall in ('FRONT', 'BACK') else W
+
+        # Minimum absolute depth CLINIC/BOH need to actually fit their
+        # largest room (its smaller side + placement gaps) — a fixed
+        # percentage of store depth alone can produce a zone too shallow
+        # to fit anything, regardless of how big the store is.
+        _MIN_CLINIC_DEPTH = 2440 + 600   # Phoropter clinic's smaller side + gaps
+        _MIN_BOH_DEPTH    = 2000 + 600   # FR Room's smaller side + gaps
+
+        clinic_depth = max(span * 0.25, _MIN_CLINIC_DEPTH)
+        boh_depth    = max(span * 0.15, _MIN_BOH_DEPTH)
+        retail_depth = max(span * 0.30, span - clinic_depth - boh_depth)
+
+        # Retail sub-zone split, expressed as fractions of retail_depth
+        # itself (not of the whole store) so they always nest correctly
+        # even when clinic_depth/boh_depth have grown past their default
+        # share of the store.
+        _front_frac, _mid_frac = 0.333, 0.750  # cumulative: front 33%, mid +42%, premium remaining 25%
 
         if self.entrance_wall == 'FRONT':
             # Entrance at y=0 (bottom), depth goes up
             retail_y1  = margin
-            retail_y2  = retail_depth
+            retail_y2  = retail_y1 + retail_depth
             clinic_y1  = retail_y2
             clinic_y2  = retail_y2 + clinic_depth
             boh_y1     = clinic_y2
@@ -315,24 +331,24 @@ class GridLayoutEngine:
 
             return {
                 'RETAIL':         (margin, W - margin, retail_y1, retail_y2),
-                'RETAIL_FRONT':   (margin, W - margin, retail_y1, retail_y1 + D * 0.20),
-                'RETAIL_MID':     (margin, W - margin, retail_y1 + D * 0.20, retail_y1 + D * 0.45),
-                'RETAIL_PREMIUM': (margin, W - margin, retail_y1 + D * 0.45, retail_y2),
+                'RETAIL_FRONT':   (margin, W - margin, retail_y1, retail_y1 + retail_depth * _front_frac),
+                'RETAIL_MID':     (margin, W - margin, retail_y1 + retail_depth * _front_frac, retail_y1 + retail_depth * _mid_frac),
+                'RETAIL_PREMIUM': (margin, W - margin, retail_y1 + retail_depth * _mid_frac, retail_y2),
                 'CLINIC':         (margin, W - margin, clinic_y1, clinic_y2),
                 'BOH':            (margin, W - margin, boh_y1, boh_y2),
                 'LEFT_WALL':      (margin, wall_strip + margin, retail_y1, retail_y2),
                 'RIGHT_WALL':     (W - wall_strip - margin, W - margin, retail_y1, retail_y2),
                 'CENTER':         (wall_strip + margin + side_margin,
                                    W - wall_strip - margin - side_margin,
-                                   retail_y1 + D * 0.20, retail_y2),
+                                   retail_y1 + retail_depth * _front_frac, retail_y2),
                 'CHECKOUT':       (margin, W - margin, D - boh_depth, D - margin),
                 'SERVICE':        (W - 3500, W - margin, clinic_y1, clinic_y2),
             }
 
         elif self.entrance_wall == 'BACK':
-            retail_y1  = D - retail_depth
+            retail_y1  = D - margin - retail_depth
             retail_y2  = D - margin
-            clinic_y1  = D - retail_depth - clinic_depth
+            clinic_y1  = retail_y1 - clinic_depth
             clinic_y2  = retail_y1
             boh_y1     = margin
             boh_y2     = clinic_y1
@@ -342,25 +358,25 @@ class GridLayoutEngine:
 
             return {
                 'RETAIL':         (margin, W - margin, retail_y1, retail_y2),
-                'RETAIL_FRONT':   (margin, W - margin, D - D * 0.20, retail_y2),
-                'RETAIL_MID':     (margin, W - margin, D - D * 0.45, D - D * 0.20),
-                'RETAIL_PREMIUM': (margin, W - margin, retail_y1, D - D * 0.45),
+                'RETAIL_FRONT':   (margin, W - margin, retail_y2 - retail_depth * _front_frac, retail_y2),
+                'RETAIL_MID':     (margin, W - margin, retail_y2 - retail_depth * _mid_frac, retail_y2 - retail_depth * _front_frac),
+                'RETAIL_PREMIUM': (margin, W - margin, retail_y1, retail_y2 - retail_depth * _mid_frac),
                 'CLINIC':         (margin, W - margin, clinic_y1, clinic_y2),
                 'BOH':            (margin, W - margin, boh_y1, boh_y2),
                 'LEFT_WALL':      (margin, wall_strip + margin, retail_y1, retail_y2),
                 'RIGHT_WALL':     (W - wall_strip - margin, W - margin, retail_y1, retail_y2),
                 'CENTER':         (wall_strip + margin + side_margin,
                                    W - wall_strip - margin - side_margin,
-                                   retail_y1, D - D * 0.20),
+                                   retail_y1, retail_y2 - retail_depth * _front_frac),
                 'CHECKOUT':       (margin, W - margin, margin, boh_depth),
                 'SERVICE':        (W - 3500, W - margin, clinic_y1, clinic_y2),
             }
 
         elif self.entrance_wall == 'LEFT':
             retail_x1  = margin
-            retail_x2  = W * 0.60
+            retail_x2  = retail_x1 + retail_depth
             clinic_x1  = retail_x2
-            clinic_x2  = retail_x2 + W * 0.25
+            clinic_x2  = retail_x2 + clinic_depth
             boh_x1     = clinic_x2
             boh_x2     = W - margin
 
@@ -369,24 +385,24 @@ class GridLayoutEngine:
 
             return {
                 'RETAIL':         (retail_x1, retail_x2, margin, D - margin),
-                'RETAIL_FRONT':   (retail_x1, retail_x1 + W * 0.20, margin, D - margin),
-                'RETAIL_MID':     (retail_x1 + W * 0.20, retail_x1 + W * 0.45, margin, D - margin),
-                'RETAIL_PREMIUM': (retail_x1 + W * 0.45, retail_x2, margin, D - margin),
+                'RETAIL_FRONT':   (retail_x1, retail_x1 + retail_depth * _front_frac, margin, D - margin),
+                'RETAIL_MID':     (retail_x1 + retail_depth * _front_frac, retail_x1 + retail_depth * _mid_frac, margin, D - margin),
+                'RETAIL_PREMIUM': (retail_x1 + retail_depth * _mid_frac, retail_x2, margin, D - margin),
                 'CLINIC':         (clinic_x1, clinic_x2, margin, D - margin),
                 'BOH':            (boh_x1, boh_x2, margin, D - margin),
                 'LEFT_WALL':      (retail_x1, retail_x2, margin, wall_strip + margin),
                 'RIGHT_WALL':     (retail_x1, retail_x2, D - wall_strip - margin, D - margin),
-                'CENTER':         (retail_x1 + W * 0.20, retail_x2,
+                'CENTER':         (retail_x1 + retail_depth * _front_frac, retail_x2,
                                    wall_strip + margin + side_margin,
                                    D - wall_strip - margin - side_margin),
-                'CHECKOUT':       (W - W * 0.15, W - margin, margin, D - margin),
+                'CHECKOUT':       (boh_x1, W - margin, margin, D - margin),
                 'SERVICE':        (clinic_x1, clinic_x2, D - 2800 - margin, D - margin),
             }
 
         else:  # RIGHT
-            retail_x1  = W * 0.40
+            retail_x1  = margin + boh_depth + clinic_depth
             retail_x2  = W - margin
-            clinic_x1  = W * 0.15
+            clinic_x1  = margin + boh_depth
             clinic_x2  = retail_x1
             boh_x1     = margin
             boh_x2     = clinic_x1
@@ -396,17 +412,17 @@ class GridLayoutEngine:
 
             return {
                 'RETAIL':         (retail_x1, retail_x2, margin, D - margin),
-                'RETAIL_FRONT':   (W - W * 0.20, retail_x2, margin, D - margin),
-                'RETAIL_MID':     (W - W * 0.45, W - W * 0.20, margin, D - margin),
-                'RETAIL_PREMIUM': (retail_x1, W - W * 0.45, margin, D - margin),
+                'RETAIL_FRONT':   (retail_x2 - retail_depth * _front_frac, retail_x2, margin, D - margin),
+                'RETAIL_MID':     (retail_x2 - retail_depth * _mid_frac, retail_x2 - retail_depth * _front_frac, margin, D - margin),
+                'RETAIL_PREMIUM': (retail_x1, retail_x2 - retail_depth * _mid_frac, margin, D - margin),
                 'CLINIC':         (clinic_x1, clinic_x2, margin, D - margin),
                 'BOH':            (boh_x1, boh_x2, margin, D - margin),
                 'LEFT_WALL':      (retail_x1, retail_x2, margin, wall_strip + margin),
                 'RIGHT_WALL':     (retail_x1, retail_x2, D - wall_strip - margin, D - margin),
-                'CENTER':         (retail_x1, W - W * 0.20,
+                'CENTER':         (retail_x1, retail_x2 - retail_depth * _front_frac,
                                    wall_strip + margin + side_margin,
                                    D - wall_strip - margin - side_margin),
-                'CHECKOUT':       (margin, W * 0.15, margin, D - margin),
+                'CHECKOUT':       (margin, boh_x2, margin, D - margin),
                 'SERVICE':        (clinic_x1, clinic_x2, D - 2800 - margin, D - margin),
             }
 

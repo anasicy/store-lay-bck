@@ -884,10 +884,8 @@ def ai_layout_dxf():
                 # (long side horizontal) even against left/right walls.
                 # Enforce: fixtures near left/right walls MUST use rotation=90
                 # so their long side runs vertically along the wall.
-                _WALL_FIXTURE_ZONES = {
-                    'RETAIL_FRONT', 'RETAIL_MID', 'RETAIL_PREMIUM',
-                    'SUNGLASSES', 'KIDS', 'SMART',
-                }
+                # Matched by fixture NAME only — never trust the AI's
+                # self-reported zone field, it's frequently wrong.
                 _WALL_FIX_TYPES = {
                     'ib frame', 'lux unit', 'luxury unit', 'hb-ya', 'hb-m',
                     'affordable', 'fastrack', 'kids', 'sunglass', 'lens unit',
@@ -909,8 +907,6 @@ def ai_layout_dxf():
                     return None
 
                 for p in ai_placements:
-                    if p.get('zone') not in _WALL_FIXTURE_ZONES:
-                        continue
                     pname_low = p['fixture'].lower()
                     if not any(k in pname_low for k in _WALL_FIX_TYPES):
                         continue
@@ -953,8 +949,6 @@ def ai_layout_dxf():
                     return None
 
                 for p in ai_placements:
-                    if p.get('zone') not in _WALL_FIXTURE_ZONES:
-                        continue
                     pname_low = p['fixture'].lower()
                     if not any(k in pname_low for k in _WALL_FIX_TYPES):
                         continue

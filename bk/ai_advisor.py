@@ -457,6 +457,29 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     }
     entrance_edge = entrance_edge_map.get(entrance_wall, 'y=0 edge (bottom)')
 
+    _has_reference_image = bool(reference_file_path) and os.path.splitext(reference_file_path)[1].lower() in {'.png', '.jpg', '.jpeg'}
+    reference_note = "" if not _has_reference_image else """
+═══════════════════════════════════════════════════════════════
+REFERENCE LAYOUT IMAGE — MATCH THIS DESIGN'S PATTERNS
+═══════════════════════════════════════════════════════════════
+An image of a human-designed CAD layout for THIS SAME STORE is attached below.
+Treat it as the target style, not just inspiration. Specifically replicate:
+1. BOH rooms packed into ONE compact contiguous cluster in a single corner of
+   the BOH zone (sharing walls with each other) — never spread thinly across
+   the full width of the zone.
+2. Both side walls (left and right) lined edge-to-edge with wall-mounted
+   fixtures, floor-to-near-rear, with no large empty gaps along the wall run.
+3. A clear cross-shaped walkway: one aisle from the entrance straight back,
+   intersected by a perpendicular aisle — keep this walkway empty.
+4. Floor/island fixtures (round tables, flatbeds) placed as a tidy row/cluster
+   in the CENTER zone, symmetric about the central aisle, not scattered.
+5. Cash counter placed centrally along the main aisle, not tucked in a corner,
+   if a cash counter is in the fixture list.
+Reproduce this SPATIAL ORGANIZATION using the ACTUAL fixtures/rooms listed
+below for this job — do not copy the reference image's specific fixture types
+or counts, only its arrangement pattern.
+"""
+
     # Compute explicit zone y-ranges for the prompt
     _retail_front_y2 = round(store_d * 0.20)
     _retail_mid_y2   = round(store_d * 0.50)
@@ -478,7 +501,7 @@ Entrance wall: {entrance_wall} → {entrance_edge}
 North direction: {north_dir} wall faces North
 {ceiling_note}
 {pillar_note}
-
+{reference_note}
 ═══════════════════════════════════════════════════════════════
 OBSTACLES — MANDATORY CLEARANCE (from the uploaded DXF)
 ═══════════════════════════════════════════════════════════════
@@ -626,6 +649,10 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
             mime = 'image/png' if ext == '.png' else 'image/jpeg'
             with open(reference_file_path, 'rb') as f:
                 encoded = base64.b64encode(f.read()).decode('utf-8')
+            user_content.append({
+                "type": "text",
+                "text": "Reference layout image (human-designed CAD plan for this same store) — match its BOH clustering, wall-fixture density, walkway cross pattern, and island/cash placement as instructed in the REFERENCE LAYOUT IMAGE section above."
+            })
             user_content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:{mime};base64,{encoded}"}
