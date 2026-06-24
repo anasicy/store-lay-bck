@@ -1,69 +1,110 @@
-127.0.0.1 - - [24/Jun/2026 22:27:43] "POST /upload HTTP/1.1" 200 -
-127.0.0.1 - - [24/Jun/2026 22:27:50] "GET /capacity-analysis/8bd766ca-adf4-415b-8a1f-0746d341fc07 HTTP/1.1" 200 -
-127.0.0.1 - - [24/Jun/2026 22:28:19] "OPTIONS /ai-layout-dxf HTTP/1.1" 200 -
-22:28:19 [LAYOUT] ======================================================================
-22:28:19 [LAYOUT] LAYOUT REQUEST  file_id=8bd766ca-adf4-415b-8a1f-0746d341fc07
-22:28:19 [LAYOUT] Store size: 13.59 m × 11.69 m  (13594 × 11689 mm)
-22:28:19 [LAYOUT] Doors detected: 2  |  Columns detected: 13
-22:28:19 [LAYOUT] Selected fixtures (13 total):
-22:28:19 [LAYOUT]   [1x] LUXURY UNIT OPEN TOP 0.82W
-22:28:19 [LAYOUT]   [1x] LUXURY UNIT GLASS TOP 0.82W
-22:28:19 [LAYOUT]   [1x] IB FRAME UNIT 2.25W
-22:28:19 [LAYOUT]   [1x] IB FRAME UNIT 1.29W
-22:28:19 [LAYOUT]   [1x] AFFORDABLE FASTRACK EYEWEAR UNIT 2.25W
-22:28:19 [LAYOUT]   [1x] AFFORDABLE FASTRACK EYEWEAR UNIT 1.29W
-22:28:19 [LAYOUT]   [1x] AFFORDABLE MEN AND WOMEN UNIT 2.25W
-22:28:19 [LAYOUT]   [1x] AFFORDABLE MEN AND WOMEN UNIT 1.29W
-22:28:19 [LAYOUT]   [1x] PREM KIDS DISPLAY UNIT LGP 1.00W
-22:28:19 [LAYOUT]   [1x] SUNGLASS UNIT - WALL MOUNT - 1.22W LH
-22:28:19 [LAYOUT]   [1x] SUNGLASS UNIT - WALL MOUNT - 1.22W RH
-22:28:19 [LAYOUT]   [1x] SUNGLASS ANGULAR UNIT -WALL MOUNT LH
-22:28:19 [LAYOUT]   [1x] SUNGLASS ANGULAR UNIT -WALL MOUNT RH
-22:28:19 [LAYOUT] BOH/Clinic rooms requested (10 total):
-22:28:19 [LAYOUT]   - FITTING LAB 1370x1830
-22:28:19 [LAYOUT]   - TOILET / WASH ROOM
-22:28:19 [LAYOUT]   - PANTRY
-22:28:19 [LAYOUT]   - FITTING ROOM 1
-22:28:19 [LAYOUT]   - FITTING ROOM 2
-22:28:19 [LAYOUT]   - FR ROOM (FRANCHISEE)
-22:28:19 [LAYOUT]   - STORAGE ROOM
-22:28:19 [LAYOUT]   - ELECTRICAL ROOM
-22:28:19 [LAYOUT]   - PHOROPTER CLINIC ROOM 1
-22:28:19 [LAYOUT]   - PHOROPTER CLINIC ROOM 2
-22:28:19 [LAYOUT] ----------------------------------------------------------------------
-22:28:22 [LAYOUT] Retrying request to /chat/completions in 0.456463 seconds
-22:28:23 [LAYOUT] Retrying request to /chat/completions in 0.953031 seconds
-22:28:28 [LAYOUT] Retrying request to /chat/completions in 0.409934 seconds
-22:28:28 [LAYOUT] Retrying request to /chat/completions in 0.921685 seconds
-22:28:29 [LAYOUT] ======================================================================
-22:28:29 [LAYOUT] PLACEMENT SUMMARY  (best variant: Classic Grid)
-22:28:29 [LAYOUT] Source: grid_engine
-22:28:29 [LAYOUT] Placed: 0 fixtures
-22:28:29 [LAYOUT] Skipped: 0 fixtures — all placed successfully
-22:28:29 [LAYOUT] Missing from output (23 items not in any placed list):
-22:28:29 [LAYOUT]   [MISSING] LUXURY UNIT OPEN TOP 0.82W
-22:28:29 [LAYOUT]   [MISSING] LUXURY UNIT GLASS TOP 0.82W
-22:28:29 [LAYOUT]   [MISSING] IB FRAME UNIT 2.25W
-22:28:29 [LAYOUT]   [MISSING] IB FRAME UNIT 1.29W
-22:28:29 [LAYOUT]   [MISSING] AFFORDABLE FASTRACK EYEWEAR UNIT 2.25W
-22:28:29 [LAYOUT]   [MISSING] AFFORDABLE FASTRACK EYEWEAR UNIT 1.29W
-22:28:29 [LAYOUT]   [MISSING] AFFORDABLE MEN AND WOMEN UNIT 2.25W
-22:28:29 [LAYOUT]   [MISSING] AFFORDABLE MEN AND WOMEN UNIT 1.29W
-22:28:29 [LAYOUT]   [MISSING] PREM KIDS DISPLAY UNIT LGP 1.00W
-22:28:29 [LAYOUT]   [MISSING] SUNGLASS UNIT - WALL MOUNT - 1.22W LH
-22:28:29 [LAYOUT]   [MISSING] SUNGLASS UNIT - WALL MOUNT - 1.22W RH
-22:28:29 [LAYOUT]   [MISSING] SUNGLASS ANGULAR UNIT -WALL MOUNT LH
-22:28:29 [LAYOUT]   [MISSING] SUNGLASS ANGULAR UNIT -WALL MOUNT RH
-22:28:29 [LAYOUT]   [MISSING] FITTING LAB 1370x1830
-22:28:29 [LAYOUT]   [MISSING] TOILET / WASH ROOM
-22:28:29 [LAYOUT]   [MISSING] PANTRY
-22:28:30 [LAYOUT]   [MISSING] FITTING ROOM 1
-22:28:30 [LAYOUT]   [MISSING] FITTING ROOM 2
-22:28:30 [LAYOUT]   [MISSING] FR ROOM (FRANCHISEE)
-22:28:30 [LAYOUT]   [MISSING] STORAGE ROOM
-22:28:30 [LAYOUT]   [MISSING] ELECTRICAL ROOM
-22:28:30 [LAYOUT]   [MISSING] PHOROPTER CLINIC ROOM 1
-22:28:30 [LAYOUT]   [MISSING] PHOROPTER CLINIC ROOM 2
-22:28:30 [LAYOUT] ======================================================================
-127.0.0.1 - - [24/Jun/2026 22:28:30] "POST /ai-layout-dxf HTTP/1.1" 200 -
-22:28:30 [LAYOUT] 127.0.0.1 - - [24/Jun/2026 22:28:30] "POST /ai-layout-dxf HTTP/1.1" 200 -
+app.jsx:914
+ Traceback (most recent call last):
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_transports\default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_sync\connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_sync\connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+        pool_request.request
+    )
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_sync\connection.py", line 101, in handle_request
+    raise exc
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_sync\connection.py", line 78, in handle_request
+    stream = self._connect(request)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_sync\connection.py", line 156, in _connect
+    stream = stream.start_tls(**kwargs)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_backends\sync.py", line 154, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Program Files\Python314\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_base_client.py", line 1037, in request
+    response = self._send_request(
+        request,
+        stream=stream or self._should_stream_response_body(request=request),
+        **kwargs,
+    )
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_client.py", line 440, in _send_request
+    return self._send_with_auth_retry(request, stream=stream, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_client.py", line 418, in _send_with_auth_retry
+    response = super()._send_request(request, stream=stream, **kwargs)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_base_client.py", line 964, in _send_request
+    return self._client.send(request, stream=stream, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_client.py", line 914, in send
+    response = self._send_handling_auth(
+        request,
+    ...<2 lines>...
+        history=[],
+    )
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+        request,
+        follow_redirects=follow_redirects,
+        history=history,
+    )
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_transports\default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\Python314\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "E:\store-lay-bck\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1081)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\store-lay-bck\bk\app.py", line 491, in ai_layout_dxf
+    ai_placements, ai_layout_style, ai_summary = get_ai_layout_placements(
+                                                 ~~~~~~~~~~~~~~~~~~~~~~~~^
+        store_boundary,
+        ^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        reference_file_path=reference_file_path,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\store-lay-bck\bk\ai_advisor.py", line 600, in get_ai_layout_placements
+    response = client.chat.completions.create(
+        model=AI_MODEL,
+        messages=[{"role": "user", "content": user_content}],  # type: ignore[arg-type]
+        max_tokens=16384,
+    )
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_utils\_utils.py", line 298, in wrapper
+    return func(*args, **kwargs)
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 1251, in create
+    return self._post(
+           ~~~~~~~~~~^
+        "/chat/completions",
+        ^^^^^^^^^^^^^^^^^^^^
+    ...<52 lines>...
+        stream_cls=Stream[ChatCompletionChunk],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_base_client.py", line 1332, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+                           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\store-lay-bck\.venv\Lib\site-packages\openai\_base_client.py", line 1072, in request
+    raise APIConnectionError(request=request) from err
+openai.APIConnectionError: Connection error.
+﻿
+
