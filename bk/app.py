@@ -636,7 +636,7 @@ def ai_layout_dxf():
                         fix_box = _SBox(p['x'], p['y'], p['x'] + fw, p['y'] + fd)
                         # Accept if at least 85% of fixture area is inside polygon
                         intersection = _store_poly_filter.intersection(fix_box)
-                        if intersection.area < fix_box.area * 0.85:
+                        if intersection.area < fix_box.area * 0.98:
                             return False
                     except Exception:
                         pass  # if Shapely fails, fall through to bbox check
@@ -810,6 +810,18 @@ def ai_layout_dxf():
                         cy += gap
                     return None
 
+                # Wall-mounted display fixture name keywords — used both to
+                # exclude them as "real" obstacles while clustering BOH rooms
+                # (the AI often dumps them mid-store/near-entrance before
+                # pass #4 below snaps them to their actual wall, so they
+                # shouldn't be allowed to block BOH packing) and by pass #4
+                # itself to enforce wall rotation.
+                _WALL_FIX_TYPES = {
+                    'ib frame', 'lux unit', 'luxury unit', 'hb-ya', 'hb-m',
+                    'affordable', 'fastrack', 'kids', 'sunglass', 'lens unit',
+                    'smart display', 'contact lens',
+                }
+
                 # --- 2. Clinics → CLINIC zone (mid-rear) ---------------------
                 _zones = engine._zones()
                 clinic_zone = _zones.get('CLINIC', _zones.get('SERVICE'))
@@ -844,40 +856,73 @@ def ai_layout_dxf():
                             # else: leave original AI position — later passes
                             # (overlap-removal / recovery) will handle it.
 
-                # --- 3. BOH rooms → BOH zone (rear) --------------------------
+                # --- 3. BOH rooms → BOH zone (rear), packed as one cluster ---
                 boh_zone = _zones.get('BOH')
                 _BOH_NAMES = {
                     'fitting lab', 'toilet', 'wash room', 'pantry',
                     'fr room', 'franchisee', 'storage room',
                     'electrical room',
                 }
+
+                # The AI frequently dumps wall-mounted display fixtures (which
+                # pass #4 below hasn't relocated to their wall yet) at y-values
+                # that fall inside the BOH zone. If those are treated as real
+                # obstacles here, they can block later BOH rooms (in iteration
+                # order) from finding a slot, leaving them stuck near the
+                # entrance — exactly the "BOH rooms scattered" symptom. Ignore
+                # them as obstacles for this pass; pass #4 will move them to
+                # an actual wall afterwards, avoiding the now-placed BOH rooms.
+                def _boh_others(p):
+                    return [o for o in ai_placements if o is not p
+                            and not any(k in o['fixture'].lower() for k in _WALL_FIX_TYPES)]
+
+                def _boh_fits(p, x, y, fw, fd):
+                    return (engine._in_store(x, y, fw, fd)
+                            and not engine._hits_obstacle(x, y, fw, fd)
+                            and not engine._overlaps(_boh_others(p), x, y, fw, fd, gap=150))
+
+                def _find_boh_slot(p, fw, fd, zx1, zx2, zy1, zy2, gap, start_x, start_y):
+                    cy = start_y
+                    while cy + fd <= zy2 - gap:
+                        cx = start_x if cy == start_y else zx1 + gap
+                        while cx + fw <= zx2 - gap:
+                            if _boh_fits(p, cx, cy, fw, fd):
+                                return (int(cx), int(cy))
+                            cx += gap
+                        cy += gap
+                    return None
+
                 if boh_zone:
                     bzx1, bzx2, bzy1, bzy2 = boh_zone
                     _bgap = 300
-                    _bx = bzx1 + _bgap
-                    _by = bzy1 + _bgap
-                    for p in ai_placements:
-                        pname_low = p['fixture'].lower()
-                        if not any(k in pname_low for k in _BOH_NAMES):
-                            continue
+
+                    _boh_items = [p for p in ai_placements
+                                  if any(k in p['fixture'].lower() for k in _BOH_NAMES)]
+                    # Biggest rooms first — packs more reliably than AI's
+                    # arbitrary placement order.
+                    _boh_items.sort(key=lambda p: max(p['l'], p['d']), reverse=True)
+
+                    cursor_x = bzx1 + _bgap
+                    cursor_y = bzy1 + _bgap
+                    row_h = 0
+                    for p in _boh_items:
                         rot = p.get('rotation', 0) in (90, 270)
                         fw = p['d'] if rot else p['l']
                         fd = p['l'] if rot else p['d']
-                        already_ok = (
-                            bzx1 <= p['x'] and p['x'] + fw <= bzx2 and
-                            bzy1 <= p['y'] and p['y'] + fd <= bzy2
-                            and _fits(p, p['x'], p['y'], fw, fd)
+                        if cursor_x + fw > bzx2 - _bgap:
+                            cursor_x = bzx1 + _bgap
+                            cursor_y += row_h + _bgap
+                            row_h = 0
+                        slot = _find_boh_slot(
+                            p, fw, fd, bzx1, bzx2, bzy1, bzy2, _bgap,
+                            cursor_x, cursor_y,
                         )
-                        if not already_ok:
-                            slot = _find_slot_in_zone(
-                                p, fw, fd, bzx1, bzx2, bzy1, bzy2, _bgap,
-                                _bx, _by,
-                            )
-                            if slot:
-                                p['x'], p['y'] = slot
-                                _bx = slot[0] + fw + _bgap
-                                _by = slot[1]
-                            # else: leave original AI position
+                        if slot:
+                            p['x'], p['y'] = slot
+                            cursor_x = slot[0] + fw + _bgap
+                            row_h = max(row_h, fd)
+                        # else: leave original AI position — later recovery /
+                        # skip-reason logging handles genuinely unplaceable items.
 
                 # --- 4. Wall fixture rotation enforcement -------------------
                 # The AI frequently places wall fixtures with rotation=0
@@ -886,11 +931,6 @@ def ai_layout_dxf():
                 # so their long side runs vertically along the wall.
                 # Matched by fixture NAME only — never trust the AI's
                 # self-reported zone field, it's frequently wrong.
-                _WALL_FIX_TYPES = {
-                    'ib frame', 'lux unit', 'luxury unit', 'hb-ya', 'hb-m',
-                    'affordable', 'fastrack', 'kids', 'sunglass', 'lens unit',
-                    'smart display', 'contact lens',
-                }
                 _WALL_THRESHOLD = W * 0.25  # within 25% of store width = near a wall
 
                 # _in_store() (used by _fits) rejects anything below margin=100,

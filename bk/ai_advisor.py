@@ -750,7 +750,7 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
                 fix_box = _SBox(x, y, x + eff_w, y + eff_d)
                 intersection = _shapely_store_poly.intersection(fix_box)
                 # Require at least 85% of fixture area inside the polygon
-                if fix_box.area > 0 and intersection.area < fix_box.area * 0.85:
+                if fix_box.area > 0 and intersection.area < fix_box.area * 0.98:
                     continue  # skip this placement — mostly outside polygon
             except Exception:
                 pass  # if Shapely fails, keep the placement

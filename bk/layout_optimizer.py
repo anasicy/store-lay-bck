@@ -442,7 +442,7 @@ class GridLayoutEngine:
                 # Require at least 85% of fixture area inside the (inset) polygon
                 # This allows wall fixtures that legitimately touch the wall edge
                 intersection = self._store_poly.intersection(fix_box)
-                return intersection.area >= fix_box.area * 0.85
+                return intersection.area >= fix_box.area * 0.98
             except Exception:
                 pass
         return True
