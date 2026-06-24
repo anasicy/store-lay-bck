@@ -371,6 +371,8 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     min_spacing    = constraints.get('minSpacing', 900)
     allow_rotation = constraints.get('allowRotation', False)
 
+    has_cash_counter = any('cash counter' in f['name'].lower() for f in selected_fixtures)
+
     fixture_list_json = json.dumps([
         {"name": f['name'], "l_mm": f['l'], "d_mm": f['d'], "h_mm": f.get('h', 1000)}
         for f in selected_fixtures
@@ -478,10 +480,10 @@ BOH PLACEMENT (rear-left corner preferred):
 CLINIC PLACEMENT (mid-rear, side by side):
 - Start clinics at x=50, y={_retail_prem_y2+300}, place side by side (x increases)
 - Each clinic: rotation=0
-
+{"" if not has_cash_counter else f'''
 CASH COUNTER (South-West corner = {sw_desc}):
 - Place at x=50, y=50 (or nearest valid position to SW corner)
-- rotation=0
+- rotation=0'''}
 
 ═══════════════════════════════════════════════════════════════
 FIXTURES TO PLACE (user-selected)
@@ -496,7 +498,7 @@ ROOMS TO PLACE (clinics + BOH — MANDATORY)
 ═══════════════════════════════════════════════════════════════
 HARD CONSTRAINTS (never violate)
 ═══════════════════════════════════════════════════════════════
-1. Cash counter MUST be in the South-West corner = {sw_desc} (Vastu).
+{"1. Cash counter MUST be in the South-West corner = " + sw_desc + " (Vastu)." if has_cash_counter else ""}
 2. Clinics MUST be in CLINIC zone (y={_retail_prem_y2}–{_clinic_y2}), NOT near entrance.
 3. BOH rooms MUST be in BOH zone (y={_boh_y1}–{store_d-50:.0f}).
 4. Retail fixtures MUST be in RETAIL zones (y=50–{_retail_prem_y2}).
@@ -506,6 +508,7 @@ HARD CONSTRAINTS (never violate)
 8. Floor fixtures (ISLAND, FLATBED, TABLE) go in CENTER zone only.
 9. Fitting Lab FIXED size: 1370 × 1830 mm.
 10. Clinic sizes: Phoropter = {clinic_size_str}.
+11. ONLY place fixtures/rooms that appear in the "FIXTURES TO PLACE" or "ROOMS TO PLACE" lists below. Do NOT invent, add, or substitute any fixture that is not explicitly listed there — not even commonly-expected items like a cash counter.
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT — STRICT JSON ONLY
