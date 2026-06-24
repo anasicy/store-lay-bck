@@ -1102,10 +1102,67 @@ def ai_layout_dxf():
                         f"[recovery] Re-attempting {len(_still_missing)} missing fixture(s) "
                         f"with grid fallback: {[f['name'] for f in _still_missing]}"
                     )
+                    _before_recovery_names = {p['fixture'].lower() for p in ai_placements}
                     engine._place_anywhere(_still_missing, ai_placements)
+
+                    # Items added by this late recovery pass skipped the
+                    # earlier zone-enforcement pass entirely (it already ran).
+                    # Re-apply BOH/clinic zone correction to just the newly
+                    # added items so they don't land outside their zone.
+                    _newly_added = [
+                        p for p in ai_placements
+                        if p['fixture'].lower() not in _before_recovery_names
+                    ]
+                    for p in _newly_added:
+                        pname_low = p['fixture'].lower()
+                        rot = p.get('rotation', 0) in (90, 270)
+                        fw = p['d'] if rot else p['l']
+                        fd = p['l'] if rot else p['d']
+
+                        if 'clinic room' in pname_low and clinic_zone:
+                            czx1, czx2, czy1, czy2 = clinic_zone
+                            already_ok = (czx1 <= p['x'] and p['x'] + fw <= czx2 and
+                                          czy1 <= p['y'] and p['y'] + fd <= czy2
+                                          and _fits(p, p['x'], p['y'], fw, fd))
+                            if not already_ok:
+                                slot = _find_slot_in_zone(p, fw, fd, czx1, czx2, czy1, czy2,
+                                                           600, czx1 + 600, czy1 + 600)
+                                if slot:
+                                    p['x'], p['y'] = slot
+                        elif any(k in pname_low for k in _BOH_NAMES) and boh_zone:
+                            bzx1, bzx2, bzy1, bzy2 = boh_zone
+                            already_ok = (bzx1 <= p['x'] and p['x'] + fw <= bzx2 and
+                                          bzy1 <= p['y'] and p['y'] + fd <= bzy2
+                                          and _fits(p, p['x'], p['y'], fw, fd))
+                            if not already_ok:
+                                slot = _find_slot_in_zone(p, fw, fd, bzx1, bzx2, bzy1, bzy2,
+                                                           300, bzx1 + 300, bzy1 + 300)
+                                if slot:
+                                    p['x'], p['y'] = slot
+
                     # Update placed names set
                     _placed_names_set = {p['fixture'].lower() for p in ai_placements}
                     placement_source = placement_source + '+recovery' if 'recovery' not in placement_source else placement_source
+
+                    # Drop stale skip entries for anything this recovery pass
+                    # successfully re-placed — a fixture can't be both
+                    # "placed" and "could not be placed" at the same time.
+                    skipped_fixtures = [
+                        s for s in skipped_fixtures
+                        if s['fixture'].lower() not in _placed_names_set
+                    ]
+
+                    # Anything still missing after every fallback attempt is
+                    # genuinely out of space — record it instead of letting
+                    # it vanish from the output with no explanation.
+                    for req_f in _still_missing:
+                        if req_f['name'].lower() not in _placed_names_set:
+                            skipped_fixtures.append({
+                                'fixture': req_f['name'],
+                                'zone': '',
+                                'size_mm': f"{req_f['l']}×{req_f['d']} mm",
+                                'reason': 'No free space found anywhere in the store after all placement attempts',
+                            })
 
         if ai_placements:
             ai_score = engine._score(ai_placements)
