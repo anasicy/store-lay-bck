@@ -873,7 +873,7 @@ function App() {
     setPlacements([]);
     setAiLayoutConcept(null);
     setSkippedFixtures([]);
-    setStatusMessage('Generating 3 layout variants…');
+    setStatusMessage('Generating AI layout…');
     setEditMode(false);
 
     const selectedWithDims = constraints.selectedFixtures.flatMap(name => {
@@ -926,10 +926,10 @@ function App() {
       const count = data.variants?.[0]?.placements?.length || 0;
       const skippedCount = (data.skipped_fixtures || []).length;
       const aiCount = (data.variants || []).filter(v => v.source === 'ai').length;
-      const srcMsg = aiCount === 3 ? 'All 3 variants AI-generated.' : aiCount > 0 ? `${aiCount}/3 variants AI-generated.` : 'AI unavailable — algorithm used.';
+      const srcMsg = aiCount > 0 ? 'AI-generated layout.' : 'AI unavailable — algorithm used as fallback.';
       const removedMsg = data.ai_fixtures_removed ? ` ⚠ ${data.ai_fixtures_removed} fixture(s) were outside boundary and auto-removed.` : '';
       const skippedMsg = skippedCount > 0 ? ` ⚠ ${skippedCount} fixture(s) could not be placed — see below.` : '';
-      setStatusMessage(`${count} fixtures placed across 3 layout variants. ${srcMsg} Switch tabs to compare.${removedMsg}${skippedMsg}`);
+      setStatusMessage(`${count} fixtures placed. ${srcMsg}${removedMsg}${skippedMsg}`);
     } catch (err) {
       setStatusMessage('Error: ' + err.message);
     } finally {
@@ -1123,7 +1123,7 @@ function App() {
 
           {/* ── Step 4: Generate ───────────────────────────────────────────── */}
           <section className="step-section">
-            <h2>Step 4 — Generate Layouts</h2>
+            <h2>Step 4 — Generate Layout</h2>
 
             <button
               className="ai-suggest-btn"
@@ -1131,8 +1131,8 @@ function App() {
               disabled={!canGenerate}
             >
               {isGenerating
-                ? <><span className="btn-spinner" /> Generating 3 layouts…</>
-                : 'Generate Layouts'}
+                ? <><span className="btn-spinner" /> Generating layout…</>
+                : 'Generate Layout'}
             </button>
 
             {!requirements && fileId && (
