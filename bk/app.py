@@ -1248,6 +1248,7 @@ def ai_layout_dxf():
                 v['placements'], store_boundary['bounds'], out_path,
                 coord_mode='bottom_left',
                 store_polygon=store_boundary.get('polygon'),
+                doors=layout_doors,
             )
             v['dxf_index'] = i
 
@@ -1342,9 +1343,11 @@ def render_edited_layout():
     try:
         processor = DXFProcessor(input_path)
         bounds = store_boundary.get('bounds', {'min': [0, 0], 'max': [10000, 8000]})
+        edited_doors = processor.detect_doors(bounds)
         processor.create_ai_layout_dxf(placements, bounds, out_path,
                                        coord_mode='bottom_left',
-                                       store_polygon=store_boundary.get('polygon'))
+                                       store_polygon=store_boundary.get('polygon'),
+                                       doors=edited_doors)
         return jsonify({'message': 'Edited layout saved', 'file_id': file_id}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

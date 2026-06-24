@@ -1627,7 +1627,7 @@ class DXFProcessor:
             return False
 
     def create_ai_layout_dxf(self, placements, store_bounds, output_path,
-                              coord_mode='center', store_polygon=None):
+                              coord_mode='center', store_polygon=None, doors=None):
         """
         Create a clean DXF with the store outline drawn at (0,0) + placed fixtures.
 
@@ -1654,6 +1654,7 @@ class DXFProcessor:
         new_doc.layers.new('AI_FIXTURES',   dxfattribs={'color': 5, 'lineweight': 50})
         new_doc.layers.new('AI_LABELS',     dxfattribs={'color': 3})
         new_doc.layers.new('AI_DIMS',       dxfattribs={'color': 6})  # magenta
+        new_doc.layers.new('DOORS',         dxfattribs={'color': 2, 'lineweight': 50})  # yellow
 
         # ── store dimensions (all output normalised to 0,0) ───────────────────
         raw_min_x = store_bounds['min'][0]
@@ -1686,6 +1687,45 @@ class DXFProcessor:
                 close=True, dxfattribs={'layer': 'STORE_OUTLINE'}
             )
 
+        # ── entrance doors (swing arc + leaf) ──────────────────────────────────
+        if doors:
+            import math
+            for door in doors:
+                try:
+                    dx = door['x'] - raw_min_x
+                    dy = door['y'] - raw_min_y
+                    r = door.get('radius', 900)
+                    sa = door.get('start_angle', 0)
+                    ea = door.get('end_angle', 90)
+                    new_msp.add_arc(center=(dx, dy), radius=r, start_angle=sa,
+                                    end_angle=ea, dxfattribs={'layer': 'DOORS'})
+                    leaf_rad = math.radians(sa)
+                    leaf_x = dx + r * math.cos(leaf_rad)
+                    leaf_y = dy + r * math.sin(leaf_rad)
+                    new_msp.add_line((dx, dy), (leaf_x, leaf_y),
+                                     dxfattribs={'layer': 'DOORS'})
+                except Exception:
+                    pass
+
+        # ── polygon-aware safety net ────────────────────────────────────────
+        # The bounding-box clamp below only keeps fixtures inside the
+        # rectangular store_w x store_d frame. For non-rectangular stores
+        # (L-shape / notches) that rectangle is bigger than the real polygon,
+        # so a fixture can pass the box clamp while still landing in a
+        # cut-out area outside the actual wall. Catch that here as a final
+        # check before drawing.
+        _store_shapely = None
+        if store_polygon and len(store_polygon) >= 3:
+            try:
+                from shapely.geometry import Polygon as _SPoly
+                _pts = [(pt[0] - raw_min_x, pt[1] - raw_min_y) for pt in store_polygon]
+                _sp = _SPoly(_pts)
+                if not _sp.is_valid:
+                    _sp = _sp.buffer(0)
+                _store_shapely = _sp.buffer(-30)
+            except Exception:
+                _store_shapely = None
+
         # ── fixtures ─────────────────────────────────────────────────────────
         # Track block names already defined (fixture DXF → block name)
         _block_cache: dict = {}   # fixture_dxf_path → block_name (or None=fallback)
@@ -1713,6 +1753,27 @@ class DXFProcessor:
             # Clamp to store bounds
             x_abs = max(0.0, min(x_abs, store_w - w))
             y_abs = max(0.0, min(y_abs, store_d - d))
+
+            # ── Polygon safety net: nudge toward the polygon centroid if the
+            # box clamp above left this fixture sitting in a notch/cut-out
+            # that's outside the real (non-rectangular) store outline ──────
+            if _store_shapely is not None:
+                try:
+                    from shapely.geometry import box as _SBox
+                    fbox = _SBox(x_abs, y_abs, x_abs + w, y_abs + d)
+                    inter = _store_shapely.intersection(fbox)
+                    if fbox.area > 0 and inter.area < fbox.area * 0.85:
+                        cx, cy = _store_shapely.centroid.x, _store_shapely.centroid.y
+                        for frac in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8):
+                            nx = max(0.0, min(x_abs + (cx - (x_abs + w / 2)) * frac, store_w - w))
+                            ny = max(0.0, min(y_abs + (cy - (y_abs + d / 2)) * frac, store_d - d))
+                            fbox2 = _SBox(nx, ny, nx + w, ny + d)
+                            inter2 = _store_shapely.intersection(fbox2)
+                            if inter2.area >= fbox2.area * 0.85:
+                                x_abs, y_abs = nx, ny
+                                break
+                except Exception:
+                    pass
 
             # ── Try to use real fixture DXF shape ────────────────────────────
             fix_path = self._find_fixture_dxf(fixture_name, store_area_sqft=store_area_sqft)
