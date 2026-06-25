@@ -523,8 +523,9 @@ def ai_layout_dxf():
         if requirements.get('has_electrical', True):     _boh_only.append('ELECTRICAL ROOM')
         _clinic_count = int(requirements.get('clinic_count', 2))
         _clinic_type  = requirements.get('clinic_type', 'PHOROPTER')
+        _clinic_types = requirements.get('clinic_types') or [_clinic_type] * _clinic_count
         _clinic_only = [
-            f"{'PHOROPTER' if _clinic_type=='PHOROPTER' else 'NORMAL'} CLINIC ROOM {i+1}"
+            f"{'PHOROPTER' if (_clinic_types[i] if i < len(_clinic_types) else _clinic_type) == 'PHOROPTER' else 'NORMAL'} CLINIC ROOM {i+1}"
             for i in range(_clinic_count)
         ]
         _boh_requested = _boh_only + _clinic_only
@@ -698,16 +699,18 @@ def ai_layout_dxf():
                         needed_counts[n] -= 1
 
                 # 2. Missing clinic rooms
-                #    Build the same list the AI prompt used.
+                #    Build the same per-clinic-type list the AI prompt used.
                 clinic_type   = requirements.get('clinic_type', 'PHOROPTER')
                 clinic_count  = int(requirements.get('clinic_count', 2))
-                clinic_l = 3050 if clinic_type == 'PHOROPTER' else 2745
-                clinic_d = 2440 if clinic_type == 'PHOROPTER' else 2135
+                clinic_types  = requirements.get('clinic_types') or [clinic_type] * clinic_count
                 clinic_h = 2800
                 for i in range(clinic_count):
+                    ct = clinic_types[i] if i < len(clinic_types) else clinic_type
+                    clinic_l = 3050 if ct == 'PHOROPTER' else 2745
+                    clinic_d = 2440 if ct == 'PHOROPTER' else 2135
                     cname = (
                         f"PHOROPTER CLINIC ROOM {i+1}"
-                        if clinic_type == 'PHOROPTER'
+                        if ct == 'PHOROPTER'
                         else f"NORMAL CLINIC ROOM {i+1}"
                     )
                     already = sum(
@@ -916,6 +919,25 @@ def ai_layout_dxf():
                         {'x': pt['x'] - _bmin[0], 'y': pt['y'] - _bmin[1]}
                         for pt in (layout_plumbing or [])
                     ]
+                    def _find_closest_boh_slot(p, fw, fd, target_x, target_y):
+                        """Scan the WHOLE BOH zone and return the valid slot
+                        closest to (target_x, target_y) — unlike
+                        _find_boh_slot, this isn't direction-biased, so it
+                        can't miss a free slot that's behind/left of the
+                        plumbing point."""
+                        best, best_d2 = None, None
+                        cy = bzy1 + _bgap
+                        while cy + fd <= bzy2 - _bgap:
+                            cx = bzx1 + _bgap
+                            while cx + fw <= bzx2 - _bgap:
+                                if _boh_fits(p, cx, cy, fw, fd):
+                                    d2 = (cx - target_x) ** 2 + (cy - target_y) ** 2
+                                    if best_d2 is None or d2 < best_d2:
+                                        best_d2, best = d2, (int(cx), int(cy))
+                                cx += _bgap
+                            cy += _bgap
+                        return best
+
                     if _norm_plumbing:
                         _water_items = [p for p in _boh_items
                                         if any(k in p['fixture'].lower() for k in _WATER_ROOM_NAMES)]
@@ -925,21 +947,22 @@ def ai_layout_dxf():
                             fd = p['l'] if rot else p['d']
                             best_slot, best_dist = None, None
                             for pt in _norm_plumbing:
-                                search_x = max(bzx1 + _bgap, min(pt['x'], bzx2 - fw - _bgap))
-                                search_y = max(bzy1 + _bgap, min(pt['y'], bzy2 - fd - _bgap))
-                                slot = _find_boh_slot(p, fw, fd, bzx1, bzx2, bzy1, bzy2,
-                                                       _bgap, search_x, search_y)
+                                slot = _find_closest_boh_slot(p, fw, fd, pt['x'], pt['y'])
                                 if slot:
                                     d2 = (slot[0] - pt['x']) ** 2 + (slot[1] - pt['y']) ** 2
                                     if best_dist is None or d2 < best_dist:
                                         best_dist, best_slot = d2, slot
                             if best_slot:
                                 p['x'], p['y'] = best_slot
-                            # Remove from the general pack either way — if no
-                            # slot near water was found, leave it at its
-                            # original position rather than letting the
-                            # generic pack place it away from water.
-                            _boh_items.remove(p)
+                                # Only now is it safe to exclude from the
+                                # general pack below — it already has a
+                                # good, water-adjacent position.
+                                _boh_items.remove(p)
+                            # else: no valid slot near any water point —
+                            # leave it in _boh_items so the general shelf-pack
+                            # still gives it a position somewhere in the BOH
+                            # zone, instead of stranding it at its original
+                            # (likely near-entrance) AI position.
 
                     # Biggest rooms first — packs more reliably than AI's
                     # arbitrary placement order.
@@ -1240,12 +1263,17 @@ def ai_layout_dxf():
 
                 # Build the full list of items that should have been placed
                 _all_requested = list(selected_fixtures)
-                # Add BOH/clinic rooms
-                _clinic_l2 = 3050 if requirements.get('clinic_type','PHOROPTER') == 'PHOROPTER' else 2745
-                _clinic_d2 = 2440 if requirements.get('clinic_type','PHOROPTER') == 'PHOROPTER' else 2135
-                for i in range(int(requirements.get('clinic_count', 2))):
-                    _ctype = 'PHOROPTER' if requirements.get('clinic_type','PHOROPTER') == 'PHOROPTER' else 'NORMAL'
-                    _all_requested.append({'name': f'{_ctype} CLINIC ROOM {i+1}', 'l': _clinic_l2, 'd': _clinic_d2, 'h': 2800})
+                # Add BOH/clinic rooms — per-clinic type, not the single legacy field
+                _clinic_count2 = int(requirements.get('clinic_count', 2))
+                _clinic_types2 = requirements.get('clinic_types') or \
+                    [requirements.get('clinic_type', 'PHOROPTER')] * _clinic_count2
+                for i in range(_clinic_count2):
+                    _ctype = (_clinic_types2[i] if i < len(_clinic_types2)
+                              else requirements.get('clinic_type', 'PHOROPTER'))
+                    _ctype = 'PHOROPTER' if _ctype == 'PHOROPTER' else 'NORMAL'
+                    _cl2 = 3050 if _ctype == 'PHOROPTER' else 2745
+                    _cd2 = 2440 if _ctype == 'PHOROPTER' else 2135
+                    _all_requested.append({'name': f'{_ctype} CLINIC ROOM {i+1}', 'l': _cl2, 'd': _cd2, 'h': 2800})
                 _boh_defs2 = []
                 if requirements.get('has_fitting_lab', True):   _boh_defs2.append(('FITTING LAB 1370x1830', 1370, 1830))
                 if requirements.get('has_toilet', True):         _boh_defs2.append(('TOILET / WASH ROOM', 1500, 1800))
