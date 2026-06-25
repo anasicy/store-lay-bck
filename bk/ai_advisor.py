@@ -280,7 +280,7 @@ def _enrich_placement(p: dict) -> dict:
 
 def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
                               requirements=None, reference_file_path=None,
-                              doors=None, columns=None):
+                              doors=None, columns=None, plumbing=None):
     """
     Call GPT-40 via Titan AI Gateway to get EXACT x,y placement coordinates
     for every fixture and room.
@@ -294,6 +294,8 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     reference_file_path: optional path to reference image/pdf.
     doors: optional list of {'x','y','radius'} in raw DXF mm — entrance/door swing zones.
     columns: optional list of {'x','y','width','height'} in raw DXF mm — structural columns/beams.
+    plumbing: optional list of {'x','y','radius'} in raw DXF mm — water inlet/outlet points.
+              Toilet/Wash Room and Fitting Lab MUST be placed adjacent to one of these.
     """
     api_key = _get_api_key()
     if not api_key:
@@ -380,6 +382,15 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
         "\n".join(obstacle_lines) if obstacle_lines
         else "None detected — no doors or columns to avoid."
     )
+
+    # ── Plumbing points (water inlet/outlet) — wet rooms must sit near these,
+    # not avoid them like obstacles ─────────────────────────────────────────
+    plumbing_lines = []
+    for pt in (plumbing or []):
+        px = round(pt['x'] - origin_x)
+        py = round(pt['y'] - origin_y)
+        plumbing_lines.append(f"- WATER POINT at ({px}, {py})")
+    plumbing_desc = "\n".join(plumbing_lines) if plumbing_lines else None
 
     # Requirements extraction
     branch_name       = requirements.get('branch_name', 'Titan Eyewear')
@@ -513,6 +524,18 @@ OBSTACLES — MANDATORY CLEARANCE (from the uploaded DXF)
 {obstacles_desc}
 BAY_BIG: {bay_big_side} side | BAY_SMALL: {'RIGHT' if bay_big_side == 'LEFT' else 'LEFT'} side
 Minimum walkway: {walkway_w} mm | Min gap between fixtures: {min_spacing} mm
+{"" if not plumbing_desc else f'''
+═══════════════════════════════════════════════════════════════
+WATER POINTS — TOILET / WASH ROOM and FITTING LAB MUST BE ADJACENT
+═══════════════════════════════════════════════════════════════
+{plumbing_desc}
+These mark existing water inlet/outlet plumbing connections. TOILET / WASH
+ROOM and FITTING LAB both need a water connection, so each MUST be placed
+with at least one of its edges within 1500 mm of one of these points (they
+may share the same point if it is large enough). Do NOT place either room
+anywhere else in the BOH zone — only adjacent to a WATER POINT. Every other
+room/fixture should treat these points as ordinary floor space (no need to
+avoid them).'''}
 
 ═══════════════════════════════════════════════════════════════
 MANDATORY ZONE LAYOUT  (entrance at y=0, rear at y={store_d:.0f})
@@ -573,6 +596,7 @@ HARD CONSTRAINTS (never violate)
 10. Clinic sizes: Phoropter = {clinic_size_str}.
 11. ONLY place fixtures/rooms that appear in the "FIXTURES TO PLACE" or "ROOMS TO PLACE" lists below. Do NOT invent, add, or substitute any fixture that is not explicitly listed there — not even commonly-expected items like a cash counter.
 12. NO fixture may overlap a door swing arc or column/beam footprint listed in OBSTACLES above (respect the stated clearance).
+{"" if not plumbing_desc else "13. TOILET / WASH ROOM and FITTING LAB MUST each be placed within 1500 mm of a WATER POINT listed above — never elsewhere in the BOH zone."}
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT — STRICT JSON ONLY

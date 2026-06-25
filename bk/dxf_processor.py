@@ -686,6 +686,81 @@ class DXFProcessor:
                 unique.append(c)
         return unique
 
+    def detect_plumbing_points(self, store_bounds=None):
+        """
+        Detect water inlet/outlet markers for wet rooms (Toilet, Fitting Lab).
+
+        These are drawn as small CIRCLE entities in close pairs (one inlet +
+        one outlet) — much smaller than structural columns. A single small
+        circle is treated as noise/unrelated and ignored; only circles found
+        in a close pair/cluster count as a real plumbing point, reported as
+        the cluster's centroid.
+
+        Returns list of dicts: {x, y, radius, layer} in mm.
+        """
+        scale = self._unit_scale()
+        MIN_R, MAX_R = 30, 200    # mm — small symbol circles only, not columns
+        PAIR_DIST = 600           # mm — max centre-to-centre gap to count as a pair
+
+        sb = store_bounds
+
+        def _in_store(cx, cy):
+            if not sb:
+                return True
+            return (sb['min'][0] <= cx <= sb['max'][0] and
+                    sb['min'][1] <= cy <= sb['max'][1])
+
+        small_circles = []
+        for entity in self._iter_all_entities():
+            if entity.dxftype() != 'CIRCLE':
+                continue
+            try:
+                layer = entity.dxf.get('layer', '0')
+                cx = entity.dxf.center.x * scale
+                cy = entity.dxf.center.y * scale
+                r = entity.dxf.radius * scale
+                if not (MIN_R <= r <= MAX_R):
+                    continue
+                if not _in_store(cx, cy):
+                    continue
+                small_circles.append({'x': cx, 'y': cy, 'radius': r, 'layer': layer})
+            except Exception:
+                continue
+
+        def _dist(a, b):
+            return ((a['x'] - b['x']) ** 2 + (a['y'] - b['y']) ** 2) ** 0.5
+
+        n = len(small_circles)
+        visited = [False] * n
+        points = []
+        for i in range(n):
+            if visited[i]:
+                continue
+            cluster = [i]
+            visited[i] = True
+            changed = True
+            while changed:
+                changed = False
+                for j in range(n):
+                    if visited[j]:
+                        continue
+                    if any(_dist(small_circles[j], small_circles[k]) <= PAIR_DIST
+                           for k in cluster):
+                        cluster.append(j)
+                        visited[j] = True
+                        changed = True
+            if len(cluster) >= 2:
+                xs = [small_circles[k]['x'] for k in cluster]
+                ys = [small_circles[k]['y'] for k in cluster]
+                avg_r = sum(small_circles[k]['radius'] for k in cluster) / len(cluster)
+                points.append({
+                    'x': round(sum(xs) / len(xs)),
+                    'y': round(sum(ys) / len(ys)),
+                    'radius': round(avg_r),
+                    'layer': small_circles[cluster[0]]['layer'],
+                })
+        return points
+
     # ── BOB (Bottom-of-Beam) height helpers ──────────────────────────────────
 
     @staticmethod

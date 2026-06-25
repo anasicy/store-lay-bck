@@ -108,6 +108,7 @@ def upload_file():
             columns = processor.detect_columns(store_bounds)
             beams = processor.detect_beams(store_bounds)
             doors = processor.detect_doors(store_bounds)
+            plumbing = processor.detect_plumbing_points(store_bounds)
         except Exception as e:
             os.remove(filepath)
             return jsonify({'error': f'Invalid or corrupt DXF file: {str(e)}'}), 400
@@ -119,6 +120,7 @@ def upload_file():
             'columns': columns,
             'beams': beams,
             'doors': doors,
+            'plumbing': plumbing,
             'message': 'File uploaded successfully'
         }), 200
     return jsonify({'error': 'Invalid file type'}), 400
@@ -472,6 +474,10 @@ def ai_layout_dxf():
             layout_columns = processor.detect_columns(store_bounds)
         except Exception:
             layout_columns = []
+        try:
+            layout_plumbing = processor.detect_plumbing_points(store_bounds)
+        except Exception:
+            layout_plumbing = []
 
         bounds = store_boundary['bounds']
         store_w = bounds['max'][0] - bounds['min'][0]
@@ -551,6 +557,7 @@ def ai_layout_dxf():
                 reference_file_path=reference_file_path,
                 doors=layout_doors,
                 columns=layout_columns,
+                plumbing=layout_plumbing,
             )
             if ai_placements and len(ai_placements) > 0:
                 # Drop any placement the AI hallucinated that wasn't actually
@@ -898,6 +905,42 @@ def ai_layout_dxf():
 
                     _boh_items = [p for p in ai_placements
                                   if any(k in p['fixture'].lower() for k in _BOH_NAMES)]
+
+                    # --- 3a. Water-dependent rooms (Toilet, Fitting Lab) MUST
+                    # sit next to a detected plumbing point. Anchor them here,
+                    # before the general shelf-pack below, so they land near
+                    # actual water inlet/outlet markers instead of wherever
+                    # the pack cursor happens to be.
+                    _WATER_ROOM_NAMES = {'toilet', 'wash room', 'fitting lab'}
+                    _norm_plumbing = [
+                        {'x': pt['x'] - _bmin[0], 'y': pt['y'] - _bmin[1]}
+                        for pt in (layout_plumbing or [])
+                    ]
+                    if _norm_plumbing:
+                        _water_items = [p for p in _boh_items
+                                        if any(k in p['fixture'].lower() for k in _WATER_ROOM_NAMES)]
+                        for p in _water_items:
+                            rot = p.get('rotation', 0) in (90, 270)
+                            fw = p['d'] if rot else p['l']
+                            fd = p['l'] if rot else p['d']
+                            best_slot, best_dist = None, None
+                            for pt in _norm_plumbing:
+                                search_x = max(bzx1 + _bgap, min(pt['x'], bzx2 - fw - _bgap))
+                                search_y = max(bzy1 + _bgap, min(pt['y'], bzy2 - fd - _bgap))
+                                slot = _find_boh_slot(p, fw, fd, bzx1, bzx2, bzy1, bzy2,
+                                                       _bgap, search_x, search_y)
+                                if slot:
+                                    d2 = (slot[0] - pt['x']) ** 2 + (slot[1] - pt['y']) ** 2
+                                    if best_dist is None or d2 < best_dist:
+                                        best_dist, best_slot = d2, slot
+                            if best_slot:
+                                p['x'], p['y'] = best_slot
+                            # Remove from the general pack either way — if no
+                            # slot near water was found, leave it at its
+                            # original position rather than letting the
+                            # generic pack place it away from water.
+                            _boh_items.remove(p)
+
                     # Biggest rooms first — packs more reliably than AI's
                     # arbitrary placement order.
                     _boh_items.sort(key=lambda p: max(p['l'], p['d']), reverse=True)
