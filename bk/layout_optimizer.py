@@ -219,7 +219,13 @@ class GridLayoutEngine:
                 poly = Polygon(pts)
                 if not poly.is_valid:
                     poly = poly.buffer(0)
-                self._store_poly = poly.buffer(-100)
+                # No inward inset here: a negative buffer can erase a narrow
+                # notch/step in the wall (e.g. a 100-200mm recess) entirely,
+                # making that cut-out area register as "inside" the store.
+                # The 98% area-overlap threshold in _in_store() already gives
+                # wall-touching fixtures enough tolerance without eroding
+                # the actual polygon shape.
+                self._store_poly = poly
             except Exception:
                 pass
 

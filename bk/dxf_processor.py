@@ -1811,7 +1811,9 @@ class DXFProcessor:
                 _sp = _SPoly(_pts)
                 if not _sp.is_valid:
                     _sp = _sp.buffer(0)
-                _store_shapely = _sp.buffer(-30)
+                # No inward inset: it can erase a narrow wall notch/step
+                # entirely, making the cut-out area register as "inside".
+                _store_shapely = _sp
             except Exception:
                 _store_shapely = None
 

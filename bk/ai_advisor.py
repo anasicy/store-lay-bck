@@ -738,8 +738,10 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
             _sp = _SPoly(_norm_pts)
             if not _sp.is_valid:
                 _sp = _sp.buffer(0)
-            # Use a small inset so fixtures touching the wall edge are accepted
-            _shapely_store_poly = _sp.buffer(-50)
+            # No inward inset: it can erase a narrow wall notch/step entirely.
+            # The 98% area-overlap threshold below already gives wall-touching
+            # fixtures enough tolerance without eroding the polygon shape.
+            _shapely_store_poly = _sp
         except Exception:
             _shapely_store_poly = None
 
