@@ -705,8 +705,8 @@ class DXFProcessor:
         Returns list of dicts: {x, y, radius, layer} in mm.
         """
         scale = self._unit_scale()
-        MIN_R, MAX_R = 30, 200    # mm — small symbol circles only, not columns
-        PAIR_DIST = 600           # mm — max centre-to-centre gap to count as a pair
+        MIN_R, MAX_R = 30, 300    # mm — small symbol circles only, not columns
+        PAIR_DIST = 900           # mm — max centre-to-centre gap to count as a pair
 
         sb = store_bounds
 

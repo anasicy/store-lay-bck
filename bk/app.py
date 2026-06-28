@@ -434,7 +434,8 @@ def ai_layout_dxf():
         _logger.info(f"Store size: {store_w/1000:.2f} m × {store_d/1000:.2f} m  "
                      f"({store_w:.0f} × {store_d:.0f} mm)")
         _logger.info(f"Doors detected: {len(layout_doors)}  |  "
-                     f"Columns detected: {len(layout_columns)}")
+                     f"Columns detected: {len(layout_columns)}  |  "
+                     f"Plumbing points detected: {len(layout_plumbing)} {layout_plumbing}")
 
         # Log selected fixtures
         _logger.info(f"Selected fixtures ({len(selected_fixtures)} total):")
@@ -1277,12 +1278,28 @@ def ai_layout_dxf():
                                     p['x'], p['y'] = slot
                         elif any(k in pname_low for k in _BOH_NAMES) and boh_zone:
                             bzx1, bzx2, bzy1, bzy2 = boh_zone
+                            # Toilet/Fitting Lab need the SAME water-point
+                            # anchoring as the main BOH pack — this item just
+                            # arrived too late (after that pack already ran)
+                            # to have gotten it. Without this, recovery-added
+                            # wet rooms ignore plumbing entirely.
+                            if (any(k in pname_low for k in _WATER_ROOM_NAMES)
+                                    and _norm_plumbing):
+                                best_slot, best_dist = None, None
+                                for pt in _norm_plumbing:
+                                    slot = _find_closest_boh_slot(p, fw, fd, pt['x'], pt['y'])
+                                    if slot:
+                                        d2 = (slot[0]-pt['x'])**2 + (slot[1]-pt['y'])**2
+                                        if best_dist is None or d2 < best_dist:
+                                            best_dist, best_slot = d2, slot
+                                if best_slot:
+                                    p['x'], p['y'] = best_slot
+                                    continue
                             already_ok = (bzx1 <= p['x'] and p['x'] + fw <= bzx2 and
                                           bzy1 <= p['y'] and p['y'] + fd <= bzy2
-                                          and _fits(p, p['x'], p['y'], fw, fd))
+                                          and _boh_fits(p, p['x'], p['y'], fw, fd))
                             if not already_ok:
-                                slot = _find_slot_in_zone(p, fw, fd, bzx1, bzx2, bzy1, bzy2,
-                                                           300, bzx1 + 300, bzy1 + 300)
+                                slot = _find_closest_boh_slot(p, fw, fd, bzx1 + 300, bzy1 + 300)
                                 if slot:
                                     p['x'], p['y'] = slot
 
