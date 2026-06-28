@@ -104,6 +104,8 @@ def classify_fixture(name: str) -> str:
         return 'SMART_UNIT'
     if 'lens unit' in n or 'contact lens' in n:
         return 'LENS_UNIT'
+    if 'sunglass' in n and 'floor' in n:
+        return 'DISPLAY'  # floor-mount sunglass unit — NOT a wall fixture
     if 'sunglass' in n and 'angular' in n:
         return 'SG_ANGULAR'
     if 'sunglass' in n and ('wall' in n or 'mount' in n):
@@ -696,11 +698,15 @@ class GridLayoutEngine:
 
     def _place_wall_fixtures_fallback(self, fixes: List[Dict], placements: List[Dict]):
         """
-        Last-resort wall placement: tries all 4 walls in sequence for any
-        wall fixture that was not placed by the primary logic.
+        Last-resort wall placement: tries all walls EXCEPT the rear/north
+        wall (which is reserved exclusively for BOH rooms) for any wall
+        fixture that was not placed by the primary logic.
         Wall fixtures must NEVER fall back to a free-floor scan.
         """
-        self._place_on_wall(fixes, placements, walls=ALL_WALLS, gap=200)
+        _north_wall = {'FRONT': 'BACK', 'BACK': 'FRONT',
+                        'LEFT': 'RIGHT', 'RIGHT': 'LEFT'}.get(self.entrance_wall, 'BACK')
+        _allowed_walls = tuple(w for w in ALL_WALLS if w != _north_wall)
+        self._place_on_wall(fixes, placements, walls=_allowed_walls, gap=200)
 
     def _place_anywhere(self, fixes: List[Dict], placements: List[Dict],
                         step: int = 300):

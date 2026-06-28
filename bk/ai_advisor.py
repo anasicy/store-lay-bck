@@ -555,7 +555,9 @@ WALL PLACEMENT PATTERN (follow exactly):
 - Left wall fixtures:  x=50, rotation=90, stacked vertically (y increases)
 - Right wall fixtures: x={_right_wall_x}, rotation=90, stacked vertically (y increases)
 - Bottom wall fixtures (entrance): y=50, rotation=0, placed horizontally (x increases)
-- Top wall fixtures (rear): y={store_d-650:.0f}, rotation=0, placed horizontally (x increases)
+- The TOP/REAR wall (the wall facing North) is RESERVED EXCLUSIVELY FOR BOH
+  ROOMS. NEVER place a retail/wall fixture against it — BOH rooms must own
+  the entire rear wall with nothing behind (north of) them.
 - Floor fixtures (islands, tables): placed in CENTER zone with {walkway_w} mm aisle clearance
 
 BOH PLACEMENT (rear-left corner preferred):
@@ -590,7 +592,7 @@ HARD CONSTRAINTS (never violate)
 4. Retail fixtures MUST be in RETAIL zones (y=50–{_retail_prem_y2}).
 5. NO two fixtures may overlap. Minimum {min_spacing} mm gap between all fixtures.
 6. All fixtures MUST fit inside the store polygon. 0 ≤ x ≤ {store_w:.0f}, 0 ≤ y ≤ {store_d:.0f}.
-7. Wall fixtures MUST be placed against walls (left, right, bottom, or top wall strip).
+7. Wall fixtures MUST be placed against the left, right, or bottom (entrance) wall ONLY. NEVER against the top/rear wall — that wall belongs exclusively to BOH rooms.
 8. Floor fixtures (ISLAND, FLATBED, TABLE) go in CENTER zone only.
 9. Fitting Lab FIXED size: 1370 × 1830 mm.
 10. Clinic sizes: Phoropter = {clinic_size_str}.
@@ -649,11 +651,11 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
       effective_w=400 → x = {store_w:.0f} - 400 - 50 = {max(0, store_w - 450):.0f}
 - Wall fixtures on the BOTTOM wall (entrance) → rotation = 0
     x = any valid position, y = 50
-- Wall fixtures on the TOP wall (rear) → rotation = 0
-    x = any valid position, y = {store_d:.0f} - d_mm - 50
+- NEVER place a wall fixture against the TOP wall (rear/north) — that wall
+  belongs exclusively to BOH rooms. There must be nothing behind them.
 - NEVER place a wall fixture with rotation=0 against a left or right wall.
   rotation=0 means the long side runs horizontally (along X axis) — only valid for
-  bottom/top wall placement.
+  bottom wall placement.
 
 - Place wall fixtures flush against walls with a 50 mm margin:
   * Left wall fixtures (rotation=90):   x = 50

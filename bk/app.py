@@ -832,6 +832,14 @@ def ai_layout_dxf():
                     'smart display', 'contact lens',
                 }
 
+                def _is_wall_fixture_name(name_low):
+                    # "FLOOR MOUNT" in the name overrides any other keyword
+                    # match — e.g. "SUNGLASS UNIT - FLOOR MOUNT" must stay a
+                    # floor fixture, not get forced against a wall.
+                    if 'floor' in name_low:
+                        return False
+                    return any(k in name_low for k in _WALL_FIX_TYPES)
+
                 # --- 2. Clinics → CLINIC zone (mid-rear) ---------------------
                 _zones = engine._zones()
                 clinic_zone = _zones.get('CLINIC', _zones.get('SERVICE'))
@@ -884,7 +892,7 @@ def ai_layout_dxf():
                 # an actual wall afterwards, avoiding the now-placed BOH rooms.
                 def _boh_others(p):
                     return [o for o in ai_placements if o is not p
-                            and not any(k in o['fixture'].lower() for k in _WALL_FIX_TYPES)]
+                            and not _is_wall_fixture_name(o['fixture'].lower())]
 
                 def _boh_fits(p, x, y, fw, fd):
                     return (engine._in_store(x, y, fw, fd)
@@ -1019,7 +1027,7 @@ def ai_layout_dxf():
 
                 for p in ai_placements:
                     pname_low = p['fixture'].lower()
-                    if not any(k in pname_low for k in _WALL_FIX_TYPES):
+                    if not _is_wall_fixture_name(pname_low):
                         continue
                     # Only fix rotation=0 placements that are near left or right wall
                     if p.get('rotation', 0) != 0:
@@ -1059,25 +1067,37 @@ def ai_layout_dxf():
                         offset += step
                     return None
 
+                # The rear/north wall is reserved exclusively for BOH rooms —
+                # a wall fixture must NEVER be allowed to sit against it, nor
+                # ever get snapped there. Map "north" to whichever raw-coord
+                # wall it actually is for this store's entrance orientation.
+                _north_is_top    = requirements['entrance_wall'] == 'FRONT'
+                _north_is_bottom = requirements['entrance_wall'] == 'BACK'
+                _north_is_right  = requirements['entrance_wall'] == 'LEFT'
+                _north_is_left   = requirements['entrance_wall'] == 'RIGHT'
+
                 for p in ai_placements:
                     pname_low = p['fixture'].lower()
-                    if not any(k in pname_low for k in _WALL_FIX_TYPES):
+                    if not _is_wall_fixture_name(pname_low):
                         continue
                     rot = p.get('rotation', 0) in (90, 270)
                     fw = p['d'] if rot else p['l']
                     fd = p['l'] if rot else p['d']
                     px, py = p['x'], p['y']
-                    # Check if fixture is NOT against any wall
-                    on_left   = px <= 200
-                    on_right  = px + fw >= W - 200
-                    on_bottom = py <= 200
-                    on_top    = py + fd >= D - 200
+                    # Check if fixture is NOT against any ALLOWED wall — being
+                    # against the north wall doesn't count as "placed", it
+                    # must be treated as floating and relocated.
+                    on_left   = px <= 200 and not _north_is_left
+                    on_right  = px + fw >= W - 200 and not _north_is_right
+                    on_bottom = py <= 200 and not _north_is_bottom
+                    on_top    = py + fd >= D - 200 and not _north_is_top
                     if not (on_left or on_right or on_bottom or on_top):
-                        # Floating — snap to nearest wall
-                        dist_left   = px
-                        dist_right  = W - (px + fw)
-                        dist_bottom = py
-                        dist_top    = D - (py + fd)
+                        # Floating (or sitting against the forbidden north
+                        # wall) — snap to the nearest ALLOWED wall.
+                        dist_left   = px if not _north_is_left else float('inf')
+                        dist_right  = (W - (px + fw)) if not _north_is_right else float('inf')
+                        dist_bottom = py if not _north_is_bottom else float('inf')
+                        dist_top    = (D - (py + fd)) if not _north_is_top else float('inf')
                         min_dist = min(dist_left, dist_right, dist_bottom, dist_top)
                         if min_dist == dist_left:
                             # Snap to left wall with rotation=90
@@ -1125,7 +1145,7 @@ def ai_layout_dxf():
                     _ry1, _ry2 = _retail_zone[2], _retail_zone[3]
                     for p in ai_placements:
                         pname_low = p['fixture'].lower()
-                        if not any(k in pname_low for k in _WALL_FIX_TYPES):
+                        if not _is_wall_fixture_name(pname_low):
                             continue
                         if p.get('rotation', 0) not in (90, 270):
                             continue  # only left/right-wall (vertical) fixtures run along Y
