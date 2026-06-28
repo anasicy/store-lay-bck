@@ -752,37 +752,6 @@ body {
   font-size: 0.75rem;
 }
 
-.boundary-picker-ai {
-  background: #10b981;
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  letter-spacing: 0.04em;
-}
-
-.boundary-ai-badge {
-  margin-left: auto;
-  background: #10b981;
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.15rem 0.5rem;
-  border-radius: 10px;
-}
-
-.boundary-detecting-spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #e67e22;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
-
 /* Boundary preview */
 .boundary-preview {
   margin-bottom: 1.25rem;

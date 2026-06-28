@@ -48,88 +48,6 @@ def _simplify_polygon(polygon, max_points=20):
     return [polygon[int(i * step)] for i in range(max_points)]
 
 
-def get_ai_boundary_index(candidates, reference_image_path):
-    """Use GPT-4o vision to identify which boundary candidate is the store interior.
-
-    candidates: list of dicts with width_mm, height_mm, layer, polygon, bounds.
-    reference_image_path: path to uploaded image/PDF.
-    Returns: int index into candidates list.
-    """
-    api_key = _get_api_key()
-    if not api_key:
-        raise ValueError("TITAN_API_KEY not set in .env")
-
-    client = OpenAI(base_url=TITAN_GATEWAY_URL, api_key=api_key, timeout=60.0)
-
-    desc_lines = []
-    for i, c in enumerate(candidates):
-        desc_lines.append(
-            f"Candidate {i}: {c['width_mm']}mm × {c['height_mm']}mm, layer='{c['layer']}'"
-        )
-    candidates_desc = "\n".join(desc_lines)
-
-    prompt = f"""You are analyzing a store floor plan image to identify the main retail store interior boundary.
-
-I extracted {len(candidates)} closed polygon candidates from a DXF architectural drawing:
-{candidates_desc}
-
-Rules for choosing the correct candidate:
-- The store interior boundary is the polygon that encloses the RETAIL SALES FLOOR where customers shop.
-- Ignore drawing sheet / title block borders (they are usually the largest rectangle with no architectural meaning).
-- Ignore site/plot boundaries (outdoor perimeter, much larger than the store).
-- Ignore small internal rooms (too small to be the main store).
-- The correct candidate is typically a medium-sized polygon that fits the visible store walls in the image.
-
-Looking at the floor plan image, return ONLY this JSON (no extra text):
-{{"boundary_index": <integer 0-{len(candidates)-1}>, "confidence": "high|medium|low", "reason": "<one sentence>"}}"""
-
-    user_content: list[dict] = [{"type": "text", "text": prompt}]
-
-    ext = os.path.splitext(reference_image_path)[1].lower()
-    if ext in {'.png', '.jpg', '.jpeg'}:
-        import base64
-        mime = 'image/png' if ext == '.png' else 'image/jpeg'
-        with open(reference_image_path, 'rb') as f:
-            encoded = base64.b64encode(f.read()).decode('utf-8')
-        user_content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:{mime};base64,{encoded}"}
-        })
-    else:
-        user_content.append({
-            "type": "text",
-            "text": "Reference file is a PDF. Use candidate dimensions and layer names to make your best guess."
-        })
-
-    response = client.chat.completions.create(
-        model=AI_MODEL,
-        messages=[{"role": "user", "content": user_content}],  # type: ignore[arg-type]
-        max_tokens=256
-    )
-
-    # ── Token usage logging ───────────────────────────────────────────────────
-    if hasattr(response, 'usage') and response.usage:
-        import logging as _tlog
-        _tlog.getLogger('layout').info(
-            f"[TOKEN USAGE] get_ai_boundary_index  "
-            f"prompt={response.usage.prompt_tokens}  "
-            f"completion={response.usage.completion_tokens}  "
-            f"total={response.usage.total_tokens}"
-        )
-        print(f"[TOKEN USAGE] boundary_index  prompt={response.usage.prompt_tokens}  "
-              f"completion={response.usage.completion_tokens}  "
-              f"total={response.usage.total_tokens}")
-
-    text = (response.choices[0].message.content or "").strip()
-    start = text.find('{')
-    end = text.rfind('}') + 1
-    if start == -1 or end == 0:
-        raise ValueError(f"AI did not return JSON for boundary detection. Response: {text[:300]!r}")
-    result = json.loads(text[start:end])
-    idx = int(result.get("boundary_index", 0))
-    return max(0, min(idx, len(candidates) - 1))
-
-
 def get_ai_explanation(placements: list, requirements: dict,
                        store_w: float, store_d: float) -> str:
     """Generate a plain-text AI explanation for the chosen layout."""
@@ -279,7 +197,7 @@ def _enrich_placement(p: dict) -> dict:
 
 
 def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
-                              requirements=None, reference_file_path=None,
+                              requirements=None,
                               doors=None, columns=None, plumbing=None):
     """
     Call GPT-40 via Titan AI Gateway to get EXACT x,y placement coordinates
@@ -291,7 +209,6 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     store_boundary: dict with 'polygon' (list of (x,y) in DXF mm) and 'bounds'.
     Coordinates passed to the AI are normalized so the store bottom-left = (0, 0).
     requirements: dict with all store requirements.
-    reference_file_path: optional path to reference image/pdf.
     doors: optional list of {'x','y','radius'} in raw DXF mm — entrance/door swing zones.
     columns: optional list of {'x','y','width','height'} in raw DXF mm — structural columns/beams.
     plumbing: optional list of {'x','y','radius'} in raw DXF mm — water inlet/outlet points.
@@ -473,13 +390,10 @@ def get_ai_layout_placements(store_boundary, selected_fixtures, constraints,
     }
     entrance_edge = entrance_edge_map.get(entrance_wall, 'y=0 edge (bottom)')
 
-    _has_reference_image = bool(reference_file_path) and os.path.splitext(reference_file_path)[1].lower() in {'.png', '.jpg', '.jpeg'}
-    reference_note = "" if not _has_reference_image else """
+    reference_note = """
 ═══════════════════════════════════════════════════════════════
-REFERENCE LAYOUT IMAGE — MATCH THIS DESIGN'S PATTERNS
+DESIGN STYLE — FOLLOW THESE PATTERNS (Titan house style)
 ═══════════════════════════════════════════════════════════════
-An image of a human-designed CAD layout for THIS SAME STORE is attached below.
-Treat it as the target style, not just inspiration. Specifically replicate:
 1. BOH rooms packed into ONE compact contiguous cluster in a single corner of
    the BOH zone (sharing walls with each other) — never spread thinly across
    the full width of the zone.
@@ -491,9 +405,6 @@ Treat it as the target style, not just inspiration. Specifically replicate:
    in the CENTER zone, symmetric about the central aisle, not scattered.
 5. Cash counter placed centrally along the main aisle, not tucked in a corner,
    if a cash counter is in the fixture list.
-Reproduce this SPATIAL ORGANIZATION using the ACTUAL fixtures/rooms listed
-below for this job — do not copy the reference image's specific fixture types
-or counts, only its arrangement pattern.
 """
 
     # Compute explicit zone y-ranges for the prompt
@@ -673,27 +584,6 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
 
     user_content: list[dict] = [{"type": "text", "text": prompt}]
 
-    if reference_file_path and os.path.exists(reference_file_path):
-        ext = os.path.splitext(reference_file_path)[1].lower()
-        if ext in {'.png', '.jpg', '.jpeg'}:
-            import base64
-            mime = 'image/png' if ext == '.png' else 'image/jpeg'
-            with open(reference_file_path, 'rb') as f:
-                encoded = base64.b64encode(f.read()).decode('utf-8')
-            user_content.append({
-                "type": "text",
-                "text": "Reference layout image (human-designed CAD plan for this same store) — match its BOH clustering, wall-fixture density, walkway cross pattern, and island/cash placement as instructed in the REFERENCE LAYOUT IMAGE section above."
-            })
-            user_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{mime};base64,{encoded}"}
-            })
-        elif ext == '.pdf':
-            user_content.append({
-                "type": "text",
-                "text": "Reference PDF uploaded. Use it as contextual guidance for zoning and fixture intent."
-            })
-
     response = client.chat.completions.create(
         model=AI_MODEL,
         messages=[{"role": "user", "content": user_content}],  # type: ignore[arg-type]
@@ -808,7 +698,7 @@ WALL FIXTURE ROTATION RULES (CRITICAL — always follow):
 # ── Legacy function kept for backward compatibility ───────────────────────────
 
 def get_ai_layout_positions(store_boundary, selected_fixtures, constraints,
-                             requirements=None, reference_file_path=None):
+                             requirements=None):
     """Legacy wrapper — returns structured text concept (used for ai_layout_concept field)."""
     api_key = _get_api_key()
     if not api_key:

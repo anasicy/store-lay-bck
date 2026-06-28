@@ -2,7 +2,6 @@ import { useState, useRef, useCallback } from 'react';
 import './app.css';
 import FileUpload from './components/FileUpload';
 import ConstraintSelector from './components/ConstraintSelector';
-import ReferenceImageUpload from './components/ReferenceImageUpload';
 import RequirementsForm from './components/RequirementsForm';
 import Layout3DView from './components/Layout3DView';
 
@@ -216,17 +215,12 @@ function BoundaryPreview({ boundary, columns = [], beams = [], doors = [] }) {
   );
 }
 
-function BoundaryPicker({ candidates, selectedIndex, onSelect, aiDetectedIndex, isDetecting }) {
+function BoundaryPicker({ candidates, selectedIndex, onSelect }) {
   if (!candidates?.length) return null;
   return (
     <div className="boundary-picker">
       <div className="boundary-picker-label">
-        {isDetecting
-          ? <><span>AI is identifying store boundary…</span><span className="boundary-detecting-spinner" /></>
-          : <span>Store boundary candidates — pick the correct outline:</span>}
-        {!isDetecting && aiDetectedIndex !== null && (
-          <span className="boundary-ai-badge">AI selected</span>
-        )}
+        <span>Store boundary candidates — pick the correct outline:</span>
       </div>
       <div className="boundary-picker-list">
         {candidates.map((c, i) => (
@@ -237,7 +231,6 @@ function BoundaryPicker({ candidates, selectedIndex, onSelect, aiDetectedIndex, 
             <span className="boundary-picker-dims">
               {c.width_mm.toLocaleString()} × {c.height_mm.toLocaleString()} mm
             </span>
-            {i === aiDetectedIndex && <span className="boundary-picker-ai">AI</span>}
             {i === selectedIndex && <span className="boundary-picker-check">✓ Active</span>}
           </button>
         ))}
@@ -794,10 +787,6 @@ function App() {
   const [columns, setColumns]                   = useState([]);
   const [beams, setBeams]                       = useState([]);
   const [doors, setDoors]                       = useState([]);
-  const [referenceFileId, setReferenceFileId]   = useState(null);
-  const [referenceFileExt, setReferenceFileExt] = useState(null);
-  const [isDetectingBoundary, setIsDetectingBoundary] = useState(false);
-  const [aiDetectedIndex, setAiDetectedIndex]   = useState(null);
 
   // Requirements step
   const [requirements, setRequirements] = useState(null);
@@ -833,25 +822,6 @@ function App() {
   const [editMode, setEditMode] = useState(false);
 
   // ── Boundary detection ──────────────────────────────────────────────────────
-  const runAiBoundaryDetect = async (fId, refId, refExt, candidates) => {
-    if (!fId || !refId || !refExt || !candidates?.length) return;
-    setIsDetectingBoundary(true);
-    try {
-      const res = await fetch('http://localhost:5000/detect-boundary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_id: fId, reference_file_id: refId, reference_file_ext: refExt }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAiDetectedIndex(data.boundary_index);
-        setBoundaryIndex(data.boundary_index);
-        setBoundary(candidates[data.boundary_index]);
-      }
-    } catch (_) { /* silent */ }
-    finally { setIsDetectingBoundary(false); }
-  };
-
   const handleFileUpload = (uploadData) => {
     const fid = uploadData.file_id;
     setFileId(fid);
@@ -859,7 +829,6 @@ function App() {
     const cands = uploadData.boundary_candidates || [];
     setBoundaryCandidates(cands);
     setBoundaryIndex(0);
-    setAiDetectedIndex(null);
     setBoundary(cands[0] || uploadData.boundary || null);
     setColumns(uploadData.columns || []);
     setBeams(uploadData.beams || []);
@@ -869,9 +838,6 @@ function App() {
     setPlacements([]);
     setAiLayoutConcept(null);
     setCapacityAnalysis(null);
-    if (referenceFileId && referenceFileExt && cands.length > 1) {
-      runAiBoundaryDetect(fid, referenceFileId, referenceFileExt, cands);
-    }
     // Trigger AI capacity analysis in background
     setIsAnalysing(true);
     fetch(`http://localhost:5000/capacity-analysis/${fid}`)
@@ -879,14 +845,6 @@ function App() {
       .then(data => { if (data) setCapacityAnalysis(data); })
       .catch(() => {})
       .finally(() => setIsAnalysing(false));
-  };
-
-  const handleReferenceUpload = (data) => {
-    setReferenceFileId(data.reference_file_id);
-    setReferenceFileExt(data.reference_file_ext);
-    if (fileId && boundaryCandidates.length > 1) {
-      runAiBoundaryDetect(fileId, data.reference_file_id, data.reference_file_ext, boundaryCandidates);
-    }
   };
 
   // ── Switch variant ──────────────────────────────────────────────────────────
@@ -927,8 +885,6 @@ function App() {
           constraints,
           selected_fixtures: selectedWithDims,
           boundary_index: boundaryIndex,
-          reference_file_id: referenceFileId,
-          reference_file_ext: referenceFileExt,
         }),
         signal: controller.signal,
       });
@@ -1059,17 +1015,6 @@ function App() {
                 <FileUpload onUploadSuccess={handleFileUpload} />
                 <p className="hint-text">Provides exact wall boundaries and dimensions</p>
               </div>
-              {/* <div className="upload-zone-wrapper">
-                <div className="zone-label">
-                  <span>Reference Image</span>
-                  <span className="zone-badge zone-badge-optional">Recommended</span>
-                </div>
-                <ReferenceImageUpload
-                  onUploadSuccess={handleReferenceUpload}
-                  onRemove={() => { setReferenceFileId(null); setReferenceFileExt(null); }}
-                />
-                <p className="hint-text">Helps AI identify entrance, glazing bays &amp; high-traffic zones</p>
-              </div> */}
             </div>
 
             {boundary && <BoundaryPreview boundary={boundary} columns={columns} beams={beams} doors={doors} />}
@@ -1078,8 +1023,6 @@ function App() {
                 candidates={boundaryCandidates}
                 selectedIndex={boundaryIndex}
                 onSelect={(i, c) => { setBoundaryIndex(i); setBoundary(c); }}
-                aiDetectedIndex={aiDetectedIndex}
-                isDetecting={isDetectingBoundary}
               />
             )}
 

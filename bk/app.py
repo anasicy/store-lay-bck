@@ -8,7 +8,7 @@ from openai import OpenAI
 from dxf_processor import DXFProcessor
 from layout_optimizer import LayoutOptimizer, GridLayoutEngine
 from ai_advisor import (get_ai_layout_placements,
-                        get_ai_boundary_index, get_ai_explanation,
+                        get_ai_explanation,
                         get_ai_capacity_analysis, TITAN_GATEWAY_URL)
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -22,7 +22,6 @@ CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'dxf'}
-REFERENCE_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
@@ -124,26 +123,6 @@ def upload_file():
             'message': 'File uploaded successfully'
         }), 200
     return jsonify({'error': 'Invalid file type'}), 400
-
-@app.route('/upload-reference', methods=['POST'])
-def upload_reference_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-    if ext not in REFERENCE_ALLOWED_EXTENSIONS:
-        return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, pdf'}), 400
-    file_id = str(uuid.uuid4())
-    filename = secure_filename(f"{file_id}.{ext}")
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
-    return jsonify({
-        'reference_file_id': file_id,
-        'reference_file_ext': ext,
-        'message': 'Reference file uploaded successfully'
-    }), 200
 
 @app.route('/structural-elements/<file_id>', methods=['GET'])
 def structural_elements(file_id):
@@ -366,40 +345,6 @@ def debug_inserts(file_id):
         import traceback
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
-@app.route('/detect-boundary', methods=['POST'])
-def detect_boundary():
-    data = request.json
-    file_id = data.get('file_id')
-    reference_file_id = data.get('reference_file_id')
-    reference_file_ext = data.get('reference_file_ext')
-    if not file_id:
-        return jsonify({'error': 'No file_id provided'}), 400
-    if not reference_file_id or not reference_file_ext:
-        return jsonify({'error': 'No reference file provided'}), 400
-    input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}.dxf")
-    if not os.path.exists(input_path):
-        return jsonify({'error': 'DXF file not found'}), 404
-    ext = reference_file_ext.lower().lstrip('.')
-    if ext not in REFERENCE_ALLOWED_EXTENSIONS:
-        return jsonify({'error': 'Invalid reference file type'}), 400
-    reference_file_path = os.path.join(app.config['UPLOAD_FOLDER'],
-                                       f"{reference_file_id}.{ext}")
-    if not os.path.exists(reference_file_path):
-        return jsonify({'error': 'Reference file not found'}), 404
-    try:
-        processor = DXFProcessor(input_path)
-        candidates = processor.get_boundary_candidates()
-        if not candidates:
-            return jsonify({'error': 'No boundary candidates found in DXF'}), 400
-        idx = get_ai_boundary_index(candidates, reference_file_path)
-        return jsonify({
-            'boundary_index': idx,
-            'boundary': candidates[idx],
-            'total_candidates': len(candidates)
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/analyze', methods=['POST'])
 def analyze_layout():
     data = request.json
@@ -430,8 +375,7 @@ def ai_layout_dxf():
     """
     Generate layout variants using AI-driven placement (GPT-5) as primary source.
     Falls back to GridLayoutEngine if AI fails or returns invalid placements.
-    Body: { file_id, requirements, selected_fixtures, constraints, boundary_index,
-            reference_file_id?, reference_file_ext? }
+    Body: { file_id, requirements, selected_fixtures, constraints, boundary_index }
     Returns: { variants: [...], ai_explanation, store_boundary, placement_source }
     """
     data = request.json
@@ -440,8 +384,6 @@ def ai_layout_dxf():
     selected_fixtures = data.get('selected_fixtures', [])
     constraints = data.get('constraints', {})
     boundary_index = int(data.get('boundary_index', 0))
-    reference_file_id = data.get('reference_file_id')
-    reference_file_ext = data.get('reference_file_ext')
 
     if not file_id:
         return jsonify({'error': 'No file_id provided'}), 400
@@ -451,14 +393,6 @@ def ai_layout_dxf():
     input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}.dxf")
     if not os.path.exists(input_path):
         return jsonify({'error': 'File not found'}), 404
-
-    reference_file_path = None
-    if reference_file_id and reference_file_ext:
-        ext = reference_file_ext.lower().lstrip('.')
-        candidate = os.path.join(app.config['UPLOAD_FOLDER'],
-        f"{reference_file_id}.{ext}")
-        if os.path.exists(candidate):
-            reference_file_path = candidate
 
     try:
         processor = DXFProcessor(input_path)
@@ -555,7 +489,6 @@ def ai_layout_dxf():
                 selected_fixtures,
                 constraints,
                 requirements=requirements,
-                reference_file_path=reference_file_path,
                 doors=layout_doors,
                 columns=layout_columns,
                 plumbing=layout_plumbing,
