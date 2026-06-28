@@ -665,7 +665,13 @@ class DXFProcessor:
                 layer_low = layer.lower()
                 is_col_layer = any(kw in layer_low for kw in self._COLUMN_LAYERS)
                 max_d = MAX_SIZE if is_col_layer else MAX_SIZE_GEO
-                if (MIN_SIZE <= diameter <= max_d) and _in_store(cx, cy):
+                # Small symbol circles (e.g. water inlet/outlet markers,
+                # ~30-200mm) satisfy the same broad size range as a real
+                # round column when no layer name is available to tell them
+                # apart. Require a larger minimum for geometry-only matches
+                # so plumbing markers aren't misdetected as columns.
+                min_d = MIN_SIZE if is_col_layer else 250
+                if (min_d <= diameter <= max_d) and _in_store(cx, cy):
                     candidates.append({
                         'x': round(cx), 'y': round(cy),
                         'width': round(diameter), 'height': round(diameter),
@@ -1762,8 +1768,10 @@ class DXFProcessor:
                 close=True, dxfattribs={'layer': 'STORE_OUTLINE'}
             )
 
-        # ── entrance doors — closed swing-wedge, matching the 2D preview's
-        # filled pie (center → arc → back to center) ──────────────────────
+        # ── entrance doors — standard "door open" symbol: one straight leaf
+        # line (hinge → open position) + the swing arc (open position →
+        # closed position along the wall). NOT a closed pie/wedge — a real
+        # door has no line drawn back from the closed position to the hinge.
         if doors:
             import math
             for door in doors:
@@ -1778,21 +1786,20 @@ class DXFProcessor:
                     # A real door swing is a quarter-ish arc. Malformed angle
                     # data (e.g. from a misread bulge) can produce a near-zero
                     # or near-full-circle span, which renders as a degenerate
-                    # bowtie/cross instead of a pie — fall back to a clean
-                    # 90 degree quarter swing in that case.
+                    # bowtie/cross instead of a clean swing — fall back to a
+                    # standard 90 degree quarter swing in that case.
                     span = (ea - sa) % 360
                     if span < 15 or span > 270:
                         ea = (sa + 90) % 360
                     start_rad = math.radians(sa)
-                    end_rad = math.radians(ea)
                     sx = dx + r * math.cos(start_rad)
                     sy = dy + r * math.sin(start_rad)
-                    ex = dx + r * math.cos(end_rad)
-                    ey = dy + r * math.sin(end_rad)
+                    # Door leaf: hinge to open position.
                     new_msp.add_line((dx, dy), (sx, sy), dxfattribs={'layer': 'DOORS'})
+                    # Swing arc: open position back to the closed position
+                    # along the wall — no line closing it back to the hinge.
                     new_msp.add_arc(center=(dx, dy), radius=r, start_angle=sa,
                                     end_angle=ea, dxfattribs={'layer': 'DOORS'})
-                    new_msp.add_line((ex, ey), (dx, dy), dxfattribs={'layer': 'DOORS'})
                 except Exception:
                     pass
 
@@ -1854,6 +1861,7 @@ class DXFProcessor:
                     fbox = _SBox(x_abs, y_abs, x_abs + w, y_abs + d)
                     inter = _store_shapely.intersection(fbox)
                     if fbox.area > 0 and inter.area < fbox.area * 0.98:
+                        fixed = False
                         cx, cy = _store_shapely.centroid.x, _store_shapely.centroid.y
                         for frac in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8):
                             nx = max(0.0, min(x_abs + (cx - (x_abs + w / 2)) * frac, store_w - w))
@@ -1862,7 +1870,28 @@ class DXFProcessor:
                             inter2 = _store_shapely.intersection(fbox2)
                             if inter2.area >= fbox2.area * 0.98:
                                 x_abs, y_abs = nx, ny
+                                fixed = True
                                 break
+                        # Centroid-nudge can still fail for an irregular
+                        # polygon (e.g. the target direction is itself
+                        # blocked by another notch). Fall back to an
+                        # exhaustive grid search over the whole store so a
+                        # fixture is NEVER rendered outside the real wall —
+                        # this is the last line of defense before drawing.
+                        if not fixed:
+                            step = 200
+                            gy = 0.0
+                            while gy + d <= store_d and not fixed:
+                                gx = 0.0
+                                while gx + w <= store_w:
+                                    fbox3 = _SBox(gx, gy, gx + w, gy + d)
+                                    inter3 = _store_shapely.intersection(fbox3)
+                                    if inter3.area >= fbox3.area * 0.98:
+                                        x_abs, y_abs = gx, gy
+                                        fixed = True
+                                        break
+                                    gx += step
+                                gy += step
                 except Exception:
                     pass
 
