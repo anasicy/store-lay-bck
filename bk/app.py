@@ -1608,12 +1608,17 @@ def _generate_layout_pdf(placements, store_boundary, requirements,
     # ── fixtures ─────────────────────────────────────────────────────────────
     for p in placements:
         rot = p.get('rotation', 0) in [90, 270]
-        fw = p['d'] if rot else p['l']
-        fd = p['l'] if rot else p['d']
-        px, py = p['x'], p['y']
+        fw = float(p.get('d') or 0) if rot else float(p.get('l') or 0)
+        fd = float(p.get('l') or 0) if rot else float(p.get('d') or 0)
+        px, py = float(p.get('x') or 0), float(p.get('y') or 0)
+        if fw <= 0 or fd <= 0:
+            continue  # malformed placement — skip rather than crash the whole PDF
 
-        zone_color = p.get('zone_color', '#94A3B8')
-        c.setFillColor(colors.HexColor(zone_color))
+        zone_color = p.get('zone_color') or '#94A3B8'
+        try:
+            c.setFillColor(colors.HexColor(zone_color))
+        except Exception:
+            c.setFillColor(colors.HexColor('#94A3B8'))
         c.setFillAlpha(0.75)
         c.setStrokeColor(colors.HexColor('#1e3a5f'))
         c.setStrokeAlpha(1)
@@ -1621,7 +1626,7 @@ def _generate_layout_pdf(placements, store_boundary, requirements,
         c.rect(tx(px), ty(py), fw * scale, fd * scale, fill=1, stroke=1)
 
         # label
-        name_short = p['fixture'][:22]
+        name_short = p.get('fixture', p.get('name', 'FIXTURE'))[:22]
         fs = max(4, min(fw, fd) * scale * 0.08)
         if fs > 4 and fw * scale > 20 and fd * scale > 10:
             c.setFillColor(colors.HexColor('#1e3a5f'))

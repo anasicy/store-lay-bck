@@ -215,9 +215,13 @@ class GridLayoutEngine:
         if polygon and len(polygon) >= 3:
             try:
                 from shapely.geometry import Polygon
+                import logging as _polylog
+                _plog = _polylog.getLogger('layout')
                 pts = [(pt[0] - bmin[0], pt[1] - bmin[1]) for pt in polygon]
                 poly = Polygon(pts)
-                if not poly.is_valid:
+                raw_area = poly.area
+                was_invalid = not poly.is_valid
+                if was_invalid:
                     poly = poly.buffer(0)
                 # No inward inset here: a negative buffer can erase a narrow
                 # notch/step in the wall (e.g. a 100-200mm recess) entirely,
@@ -226,8 +230,25 @@ class GridLayoutEngine:
                 # wall-touching fixtures enough tolerance without eroding
                 # the actual polygon shape.
                 self._store_poly = poly
-            except Exception:
-                pass
+                _plog.info(
+                    f"[POLYGON] vertices={len(pts)} was_invalid={was_invalid} "
+                    f"raw_area_m2={raw_area/1e6:.2f} final_area_m2={poly.area/1e6:.2f} "
+                    f"geom_type={poly.geom_type}"
+                )
+                if was_invalid and abs(poly.area - raw_area) / max(raw_area, 1) > 0.02:
+                    _plog.warning(
+                        f"[POLYGON] buffer(0) repair changed area by "
+                        f"{(poly.area-raw_area)/max(raw_area,1)*100:.1f}% — the "
+                        f"input polygon has a self-intersection/near-duplicate "
+                        f"vertex (likely at the notch) and Shapely's auto-repair "
+                        f"may have resolved it differently than intended."
+                    )
+            except Exception as _poly_exc:
+                import logging as _polylog2
+                _polylog2.getLogger('layout').warning(
+                    f"[POLYGON] failed to build containment polygon: {_poly_exc!r} "
+                    f"— containment checks will be SKIPPED for this store."
+                )
 
         # Door clearance zones — no fixture may block 1500 mm in front of a door
         DOOR_CLEARANCE = 1500

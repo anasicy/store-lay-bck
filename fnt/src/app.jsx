@@ -1016,7 +1016,11 @@ function App() {
         requirements, variant_name: variantName,
       }),
     });
-    if (!res.ok) { setStatusMessage('PDF generation failed'); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatusMessage(`PDF generation failed: ${err.error || res.status}`);
+      return;
+    }
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
