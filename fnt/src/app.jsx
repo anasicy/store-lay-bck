@@ -1129,7 +1129,7 @@ function App() {
             {isGenerating && (
               <div className="generating-progress">
                 <div className="generating-bar" />
-                <span className="generating-label">AI is designing your store layout — this takes 30–60 seconds…</span>
+                <span className="generating-label">AI is designing your store layout — this takes 2–3 minutes…</span>
               </div>
             )}
 

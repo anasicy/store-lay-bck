@@ -774,6 +774,55 @@ def ai_layout_dxf():
                         return False
                     return any(k in name_low for k in _WALL_FIX_TYPES)
 
+                # The AI frequently dumps wall-mounted display fixtures (which
+                # pass #4 below hasn't relocated to their wall yet) at
+                # positions that fall inside the CLINIC/BOH zones. If those
+                # are treated as real obstacles during clinic/BOH packing,
+                # they can block rooms from finding a slot, leaving them
+                # stuck near the entrance — the "rooms scattered" symptom.
+                # Ignore them as obstacles here; pass #4 will move them to
+                # an actual wall afterwards, avoiding the now-placed rooms.
+                # Defined before pass #2 so BOTH the original clinic/BOH
+                # placement passes and the later recovery-correction passes
+                # share this same wall-fixture-excluding logic.
+                def _boh_others(p):
+                    return [o for o in ai_placements if o is not p
+                            and not _is_wall_fixture_name(o['fixture'].lower())]
+
+                def _boh_fits(p, x, y, fw, fd):
+                    return (engine._in_store(x, y, fw, fd)
+                            and not engine._hits_obstacle(x, y, fw, fd)
+                            and not engine._overlaps(_boh_others(p), x, y, fw, fd, gap=150))
+
+                def _find_boh_slot(p, fw, fd, zx1, zx2, zy1, zy2, gap, start_x, start_y):
+                    cy = start_y
+                    while cy + fd <= zy2 - gap:
+                        cx = start_x if cy == start_y else zx1 + gap
+                        while cx + fw <= zx2 - gap:
+                            if _boh_fits(p, cx, cy, fw, fd):
+                                return (int(cx), int(cy))
+                            cx += gap
+                        cy += gap
+                    return None
+
+                def _find_closest_slot_in_zone(p, fw, fd, zx1, zx2, zy1, zy2, gap,
+                                               target_x, target_y):
+                    """Scan a zone and return the valid slot (ignoring
+                    not-yet-relocated wall fixtures as obstacles, same as
+                    _boh_fits) closest to (target_x, target_y)."""
+                    best, best_d2 = None, None
+                    cy = zy1 + gap
+                    while cy + fd <= zy2 - gap:
+                        cx = zx1 + gap
+                        while cx + fw <= zx2 - gap:
+                            if _boh_fits(p, cx, cy, fw, fd):
+                                d2 = (cx - target_x) ** 2 + (cy - target_y) ** 2
+                                if best_d2 is None or d2 < best_d2:
+                                    best_d2, best = d2, (int(cx), int(cy))
+                            cx += gap
+                        cy += gap
+                    return best
+
                 # --- 2. Clinics → CLINIC zone (mid-rear) ---------------------
                 _zones = engine._zones()
                 clinic_zone = _zones.get('CLINIC', _zones.get('SERVICE'))
@@ -794,10 +843,10 @@ def ai_layout_dxf():
                         already_ok = (
                             czx1 <= p['x'] and p['x'] + fw <= czx2 and
                             czy1 <= p['y'] and p['y'] + fd <= czy2
-                            and _fits(p, p['x'], p['y'], fw, fd)
+                            and _boh_fits(p, p['x'], p['y'], fw, fd)
                         )
                         if not already_ok:
-                            slot = _find_slot_in_zone(
+                            slot = _find_closest_slot_in_zone(
                                 p, fw, fd, czx1, czx2, czy1, czy2, _gap,
                                 _cx_cursor, _cy_cursor,
                             )
@@ -815,34 +864,6 @@ def ai_layout_dxf():
                     'fr room', 'franchisee', 'storage room',
                     'electrical room',
                 }
-
-                # The AI frequently dumps wall-mounted display fixtures (which
-                # pass #4 below hasn't relocated to their wall yet) at y-values
-                # that fall inside the BOH zone. If those are treated as real
-                # obstacles here, they can block later BOH rooms (in iteration
-                # order) from finding a slot, leaving them stuck near the
-                # entrance — exactly the "BOH rooms scattered" symptom. Ignore
-                # them as obstacles for this pass; pass #4 will move them to
-                # an actual wall afterwards, avoiding the now-placed BOH rooms.
-                def _boh_others(p):
-                    return [o for o in ai_placements if o is not p
-                            and not _is_wall_fixture_name(o['fixture'].lower())]
-
-                def _boh_fits(p, x, y, fw, fd):
-                    return (engine._in_store(x, y, fw, fd)
-                            and not engine._hits_obstacle(x, y, fw, fd)
-                            and not engine._overlaps(_boh_others(p), x, y, fw, fd, gap=150))
-
-                def _find_boh_slot(p, fw, fd, zx1, zx2, zy1, zy2, gap, start_x, start_y):
-                    cy = start_y
-                    while cy + fd <= zy2 - gap:
-                        cx = start_x if cy == start_y else zx1 + gap
-                        while cx + fw <= zx2 - gap:
-                            if _boh_fits(p, cx, cy, fw, fd):
-                                return (int(cx), int(cy))
-                            cx += gap
-                        cy += gap
-                    return None
 
                 if boh_zone:
                     bzx1, bzx2, bzy1, bzy2 = boh_zone
@@ -1270,10 +1291,10 @@ def ai_layout_dxf():
                             czx1, czx2, czy1, czy2 = clinic_zone
                             already_ok = (czx1 <= p['x'] and p['x'] + fw <= czx2 and
                                           czy1 <= p['y'] and p['y'] + fd <= czy2
-                                          and _fits(p, p['x'], p['y'], fw, fd))
+                                          and _boh_fits(p, p['x'], p['y'], fw, fd))
                             if not already_ok:
-                                slot = _find_slot_in_zone(p, fw, fd, czx1, czx2, czy1, czy2,
-                                                           600, czx1 + 600, czy1 + 600)
+                                slot = _find_closest_slot_in_zone(p, fw, fd, czx1, czx2, czy1, czy2,
+                                                                  600, czx1 + 600, czy1 + 600)
                                 if slot:
                                     p['x'], p['y'] = slot
                         elif any(k in pname_low for k in _BOH_NAMES) and boh_zone:
